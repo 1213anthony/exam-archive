@@ -345,7 +345,11 @@ function isFlagged(r) {
   // duplicate_sibling_folder는 빼둔다 - 같은 파일이 두 벌 있는 건 화면에서
   // 이미 하나로 합쳐서 보여주므로 여기서 볼 일이 없다. (드라이브에서 실제로
   // 지워야 할 목록은 review.html의 "동명 폴더" 섹션에 정리돼 있음)
-  if (!(!r.parsed_ok || r.folder_mismatch)) return false;
+  // folder_mismatch(폴더 위치 다름)도 뺀다 - PDF 표지까지 대조해본 결과 화면에
+  // 뜨는 값은 거의 다 정확했고(92/115), 드라이브 폴더 이름만 틀린 거라 여기서
+  // 볼 일이 아니다. 줄에는 회색 표시로 계속 남고, 드라이브에서 옮겨야 할 목록은
+  // review.html의 "폴더 불일치" 섹션에 그대로 있다.
+  if (r.parsed_ok) return false;
   return !isReviewed(examKey(r));   // "확인함"으로 처리한 시험은 목록에서 뺀다
 }
 function examKey(r) {
