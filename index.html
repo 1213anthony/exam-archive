@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기출문제 아카이브</title>
+<script src="data.js"></script>
+<style>
+  :root {
+    /* 무채색 위주 + 포인트 색 하나(청회색)만 쓴다 */
+    --paper: #FAFAFA;
+    --card: #FFFFFF;
+    --line: #E0E0E0;
+    --line-soft: #EEEEEE;
+    --ink: #1B1B1B;
+    --ink-mid: #5C5C5C;
+    --ink-soft: #979797;
+    --accent: #35566E;        /* 포인트: 차분한 청회색 */
+    --accent-soft: #EDF1F4;
+    --green: #35566E;         /* 해설도 같은 계열 - 채도로만 구분 */
+    --green-soft: #F4F6F7;
+    --blue: #35566E;
+    --blue-soft: #EDF1F4;
+    --red: #6B6B6B;           /* 경고도 원색 대신 회색 */
+    --red-soft: #F0F0F0;
+    --star: #35566E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", ui-sans-serif, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 20px 100px; }
+
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
+  h1 {
+    font-family: Georgia, "Nanum Myeongjo", ui-serif, serif;
+    font-size: 30px; font-weight: 600; margin: 0 0 6px; letter-spacing: -.01em;
+  }
+  header p { margin: 0; color: var(--ink-soft); font-size: 13.5px; }
+
+  /* ---- 검색 + 분류 탭 ---- */
+  .searchbar { margin: 22px 0 14px; display: flex; gap: 8px; }
+  .searchbar input {
+    flex: 1; font: inherit; font-size: 16px; padding: 11px 14px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--ink);
+  }
+  .searchbar input:focus { outline: none; border-color: var(--green); }
+  .searchbar button {
+    font: inherit; font-size: 13px; padding: 0 14px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--ink-mid);
+    white-space: nowrap;
+  }
+  .searchbar button.on { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+
+  .cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .cat {
+    font-size: 13.5px; padding: 7px 13px; cursor: pointer; user-select: none;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink-mid);
+  }
+  .cat:hover { border-color: var(--ink-soft); }
+  .cat.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .cat .n { opacity: .55; margin-left: 5px; font-size: 12px; }
+
+  .statusline {
+    font-size: 12.5px; color: var(--ink-soft);
+    margin: 16px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft);
+  }
+
+  /* ---- 과목 섹션 ---- */
+  details.subject { border-bottom: 1px solid var(--line-soft); }
+  details.subject > summary {
+    cursor: pointer; list-style: none; padding: 14px 2px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  details.subject > summary::-webkit-details-marker { display: none; }
+  details.subject > summary::before {
+    content: "▸"; color: var(--ink-soft); font-size: 12px; width: 12px; flex-shrink: 0;
+  }
+  details.subject[open] > summary::before { content: "▾"; }
+  .subj-name { font-size: 16px; font-weight: 600; }
+  .subj-meta { font-size: 12.5px; color: var(--ink-soft); }
+  .subj-body { padding: 2px 0 16px 22px; }
+  .star {
+    margin-left: auto; font-size: 17px; line-height: 1; color: var(--ink-soft);
+    cursor: pointer; user-select: none; padding: 2px 4px;
+  }
+  .star:hover { color: var(--star); }
+  .star.on { color: var(--star); }
+
+  /* ---- 시험 한 줄 (문제지 + 해설 나란히) ---- */
+  .exam {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 0; border-top: 1px solid var(--line-soft);
+  }
+  .exam:first-child { border-top: none; }
+  .exam.exam-clustered { align-items: flex-start; }
+  .exam-label { flex: 1; min-width: 0; }
+  .exam-when { font-size: 14.5px; }
+  .exam-when .yr { font-family: Georgia, serif; font-weight: 600; }
+  .exam-when .unknown { color: var(--ink-soft); font-style: italic; }
+  .exam-files { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; word-break: break-all; }
+  .btns { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; max-width: 300px; }
+  .btns-clustered { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; align-items: flex-end; }
+  .mini-cluster { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .mini-label { font-size: 11.5px; color: var(--ink-mid); white-space: nowrap; }
+  a.btn {
+    font-size: 12.5px; text-decoration: none; padding: 6px 12px;
+    border-radius: 4px; border: 1px solid; white-space: nowrap;
+  }
+  /* 색을 두 개 쓰는 대신, 문제=채움 / 해설=외곽선 으로 구분한다 */
+  a.btn.q { color: #fff; border-color: var(--accent); background: var(--accent); }
+  a.btn.q:hover { background: #244052; border-color: #244052; }
+  a.btn.a { color: var(--accent); border-color: var(--line); background: var(--card); }
+  a.btn.a:hover { border-color: var(--accent); background: var(--accent-soft); }
+  span.btn-none {
+    font-size: 12.5px; padding: 6px 12px; border-radius: 4px;
+    border: 1px dashed var(--line); color: var(--ink-soft); white-space: nowrap;
+  }
+  .flag {
+    display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px;
+    background: var(--red-soft); color: var(--red); margin-left: 6px; vertical-align: 1px;
+  }
+  /* 중복 합침 / 폴더 위치 안내는 "데이터 오류"가 아니라서 눈에 덜 띄게 */
+  .flag.dup, .flag.muted { background: var(--line-soft); color: var(--ink-soft); }
+
+  /* 직접 정리하는 버튼들 */
+  .reviewbtn {
+    font: inherit; font-size: 11px; margin-left: 6px; padding: 1px 8px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 3px;
+    background: var(--card); color: var(--ink-soft); vertical-align: 1px;
+  }
+  .reviewbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .reviewbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .hidebtn {
+    font: inherit; font-size: 13px; line-height: 1; margin-left: 2px; padding: 3px 5px;
+    cursor: pointer; border: 1px solid transparent; border-radius: 3px;
+    background: transparent; color: var(--ink-soft);
+  }
+  .hidebtn:hover { border-color: var(--line); background: var(--line-soft); color: var(--ink); }
+  .hiddennote {
+    font-size: 12.5px; color: var(--ink-mid); background: var(--line-soft);
+    border-radius: 4px; padding: 8px 12px; margin: 10px 0 0;
+  }
+  .hiddennote button {
+    font: inherit; font-size: 12px; margin-left: 8px; padding: 3px 9px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 3px; background: var(--card); color: var(--ink-mid);
+  }
+  .hiddennote button:hover { border-color: var(--accent); color: var(--accent); }
+  .extra { margin-top: 4px; }
+  .extra a { font-size: 11.5px; color: var(--ink-mid); margin-right: 10px; }
+
+  .empty { padding: 50px 0; text-align: center; color: var(--ink-soft); font-size: 14px; }
+  .empty a { color: var(--blue); }
+
+  /* ---- 체크박스 + 선택 다운로드 ---- */
+  .btn-wrap { display: inline-flex; align-items: center; gap: 3px; }
+  .pick { cursor: pointer; accent-color: var(--blue); width: 14px; height: 14px; margin: 0; }
+  .selectbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: var(--ink); color: #fff; padding: 12px 20px;
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    box-shadow: 0 -2px 14px rgba(0,0,0,.18); font-size: 13.5px;
+  }
+  .selectbar button {
+    font: inherit; font-size: 13px; padding: 8px 16px; cursor: pointer;
+    border-radius: 4px; border: 1px solid transparent;
+  }
+  #downloadBtn { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
+  #downloadBtn:hover { background: var(--blue); color: #fff; }
+  #deleteListBtn { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+  #deleteListBtn:hover { background: var(--red); border-color: var(--red); }
+  #clearSelBtn { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+  #clearSelBtn:hover { border-color: #fff; }
+
+  @media (max-width: 600px) {
+    .exam, .exam.exam-clustered { flex-wrap: wrap; }
+    .btns, .btns-clustered { max-width: none; width: 100%; justify-content: flex-start; margin-top: 4px; }
+    .mini-cluster { justify-content: flex-start; }
+    .selectbar { flex-wrap: wrap; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>기출문제 아카이브</h1>
+    <p>분류 → 과목 → 시험 순으로 정리했고, 문제지와 해설은 한 줄에 같이 있습니다.</p>
+  </header>
+
+  <div class="searchbar">
+    <input id="q" type="search" placeholder="과목, 연도, 파일명으로 검색…" autocomplete="off">
+    <button id="favbtn" title="과목 이름 옆 별표로 즐겨찾기한 과목만 보기">즐겨찾기만</button>
+    <button id="flagbtn" title="드라이브에서 엉뚱한 폴더에 들어있거나(폴더 위치 다름), 파일명에 정보가 없어 연도·학기를 확정 못 한(미분류) 항목만 보기 - 화면에 보이는 값 자체는 대부분 정확함">정리 필요만</button>
+  </div>
+  <div class="cats" id="cats"></div>
+  <div class="statusline" id="status"></div>
+  <div class="hiddennote" id="hiddennote" style="display:none;"></div>
+  <div id="out"></div>
+  <div class="empty" id="empty" style="display:none;">해당하는 자료가 없습니다.</div>
+</div>
+
+<div class="selectbar" id="selectbar" style="display:none;">
+  <span id="selcount"></span>
+  <button id="downloadBtn">선택한 파일 다운로드</button>
+  <button id="deleteListBtn" title="선택한 파일들의 목록을 to_delete.txt로 저장합니다. 그 파일을 delete_files.py로 넘기면 드라이브 휴지통으로 이동합니다(완전 삭제 아님)">삭제 목록 내보내기</button>
+  <button id="clearSelBtn">선택 해제</button>
+</div>
+
+<script>
+var DATA = (typeof EXAM_DATA !== 'undefined') ? EXAM_DATA : [];
+
+// 학교에서 쓰는 12개 분류 순서 (데이터에 없는 분류는 자동으로 숨김)
+var CAT_ORDER = ['국어','수학','물리','화학','생명과학','지구과학','정보',
+                 '사회','외국어','실험','예체능','창의융합특강'];
+
+// ---- 즐겨찾기 (localStorage, 브라우저별로 저장) ----
+var FAV_KEY = 'examArchive.favorites.v1';
+var FAVONLY_KEY = 'examArchive.favOnly.v1';
+
+function loadFavorites() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+function saveFavorites(favs) {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(favs)); } catch (e) {}
+}
+function loadFavOnly() {
+  try {
+    var v = localStorage.getItem(FAVONLY_KEY);
+    return v === null ? true : v === '1'; // 처음 방문 땐 기본 켜짐(요청사항)
+  } catch (e) { return true; }
+}
+function saveFavOnly(v) {
+  try { localStorage.setItem(FAVONLY_KEY, v ? '1' : '0'); } catch (e) {}
+}
+
+var favorites = loadFavorites();
+function favKey(cat, subj) { return cat + '|' + subj; }
+function isFavorite(cat, subj) { return !!favorites[favKey(cat, subj)]; }
+function toggleFavorite(cat, subj) {
+  var k = favKey(cat, subj);
+  if (favorites[k]) delete favorites[k]; else favorites[k] = true;
+  saveFavorites(favorites);
+}
+function hasAnyFavorite() { return Object.keys(favorites).length > 0; }
+
+// ---- 직접 정리한 내역 (localStorage) ----------------------------------------
+// 1) reviewed: "정리 필요"에서 확인 끝난 시험 - 목록에서 빠진다
+// 2) hidden:   같은 파일이 두 벌인데 자동으로 못 걸러낸 것 - 하나를 숨긴다
+//    (드라이브 파일을 지우는 게 아니라 이 브라우저에서 안 보이게만 하는 것.
+//     실제로 지우려면 숨긴 목록을 내보내서 delete_files.py로 넘기면 된다)
+var REVIEWED_KEY = 'examArchive.reviewed.v1';
+var HIDDEN_KEY = 'examArchive.hidden.v1';
+
+function loadMap(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '{}'); }
+  catch (e) { return {}; }
+}
+function saveMap(key, obj) {
+  try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) {}
+}
+
+var reviewed = loadMap(REVIEWED_KEY);
+var hidden = loadMap(HIDDEN_KEY);
+
+function isReviewed(k) { return !!reviewed[k]; }
+function markReviewed(k, on) {
+  if (on) reviewed[k] = new Date().toISOString().slice(0, 10);
+  else delete reviewed[k];
+  saveMap(REVIEWED_KEY, reviewed);
+}
+function isHidden(r) { return !!hidden[r.id]; }
+function hideFile(r) {
+  hidden[r.id] = { filename: r.filename, at: new Date().toISOString().slice(0, 10) };
+  saveMap(HIDDEN_KEY, hidden);
+}
+function unhideAll() { hidden = {}; saveMap(HIDDEN_KEY, hidden); }
+
+// 파일 목록을 to_delete.txt로 저장한다. 이 페이지는 드라이브를 못 고치므로
+// (읽기 전용) 목록만 만들고, 실제 삭제는 delete_files.py가 확인 절차를 거쳐 한다.
+function exportDeleteList(records) {
+  if (!records || !records.length) return;
+  var lines = [
+    '# 기출문제 아카이브 - 삭제 예정 목록',
+    '# 만든 시각: ' + new Date().toLocaleString('ko-KR'),
+    '# 사용법: python delete_files.py to_delete.txt',
+    '#   먼저 확인만 하려면: python delete_files.py to_delete.txt --dry-run',
+    '# 완전 삭제가 아니라 드라이브 휴지통으로 이동합니다.',
+    ''
+  ];
+  records.forEach(function (r) { lines.push(r.id + '\t' + (r.filename || '')); });
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'to_delete.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+var state = { cat: null, q: '', flagOnly: false, favOnly: loadFavOnly(), selected: {} };
+
+// ---- 선택 다운로드 ----
+// 드라이브 "보기" 링크(.../view) 대신 바로 다운로드되는 링크를 씀
+function downloadUrl(id) { return 'https://drive.google.com/uc?export=download&id=' + id; }
+function isSelected(r) { return !!state.selected[r.id]; }
+function toggleSelect(r, on) {
+  if (on) state.selected[r.id] = r; else delete state.selected[r.id];
+  updateSelectionBar();
+}
+function updateSelectionBar() {
+  var ids = Object.keys(state.selected);
+  var bar = document.getElementById('selectbar');
+  document.getElementById('selcount').textContent = ids.length + '개 선택됨';
+  bar.style.display = ids.length ? 'flex' : 'none';
+}
+function makeCheckbox(r) {
+  var cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'pick';
+  cb.title = '선택해서 나중에 한 번에 다운로드';
+  cb.checked = isSelected(r);
+  cb.addEventListener('click', function (e) { e.stopPropagation(); });
+  cb.addEventListener('change', function () { toggleSelect(r, cb.checked); });
+  return cb;
+}
+
+function isSolution(dt) {
+  if (!dt) return false;
+  return dt.indexOf('답안') >= 0 || dt.indexOf('해설') >= 0 || dt.indexOf('정답') >= 0;
+}
+function isProblem(dt) {
+  return !!dt && dt.indexOf('문제') >= 0;
+}
+function isFlagged(r) {
+  // duplicate_sibling_folder는 빼둔다 - 같은 파일이 두 벌 있는 건 화면에서
+  // 이미 하나로 합쳐서 보여주므로 여기서 볼 일이 없다. (드라이브에서 실제로
+  // 지워야 할 목록은 review.html의 "동명 폴더" 섹션에 정리돼 있음)
+  if (!(!r.parsed_ok || r.folder_mismatch)) return false;
+  return !isReviewed(examKey(r));   // "확인함"으로 처리한 시험은 목록에서 뺀다
+}
+function examKey(r) {
+  return [r.subject, r.year || '?', r.semester || '?', r.examtype || '?'].join('|');
+}
+function matchesQuery(r, q) {
+  if (!q) return true;
+  var hay = [r.category, r.subject, r.year, r.semester, r.examtype, r.doctype, r.filename]
+    .filter(Boolean).join(' ').toLowerCase();
+  return hay.indexOf(q.toLowerCase()) >= 0;
+}
+
+// ---- 한 시험 줄에 파일이 너무 많이 몰릴 때(예: "문학" 폴더에 고전문학/현대문학이
+// 섞여있는 경우) 화면 표시만 파일명 속 세부과목(subject_detail)으로 나눠서 보여준다.
+// 주의: 이건 순수 표시용 - 문제/해설 페어링(examKey)에는 전혀 영향 안 줌. 표기
+// 흔들림(고급물리학I/1/Ⅰ 등)이 있어서 매칭 키로 쓰면 오히려 페어가 깨지는 걸
+// 확인했음(crawl.py 주석 참고).
+function normDetail(s) {
+  if (!s) return null;
+  s = s.replace(/\s+/g, '');
+  s = s.replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III').replace(/Ⅳ/g, 'IV')
+       .replace(/ⅰ/g, 'I').replace(/ⅱ/g, 'II').replace(/ⅲ/g, 'III').replace(/ⅳ/g, 'IV');
+  s = s.replace(/IV$/, '4').replace(/III$/, '3').replace(/II$/, '2');
+  s = s.replace(/(^|[^I])I$/, function (m, p1) { return p1 + '1'; });
+  return s.toLowerCase();
+}
+// ---- 똑같은 파일이 두 번 올라와 있는 경우 하나로 합치기 --------------------
+// "동명 폴더"(같은 이름 폴더가 2개) 때문에 같은 시험지가 두 벌씩 들어있는 게
+// 실제로 확인됐다(520개를 다운받아 MD5 대조). 화면에서는 하나만 보여준다.
+// 판단 기준은 내용 해시(md5) 우선 - 파일명이 달라도 내용이 같은 경우가 45쌍
+// 있었기 때문. 해시가 없는 파일은 (파일명+크기)로 대신 판단한다.
+function contentKey(r) {
+  if (r.md5) return 'h:' + r.md5;
+  return 'n:' + r.filename + '|' + (r.size == null ? '' : r.size);
+}
+function dedupeRecords(list) {
+  var seen = {}, out = [];
+  list.forEach(function (r) {
+    var k = contentKey(r);
+    if (seen[k]) { seen[k].dupCount++; return; }
+    var copy = { rec: r, dupCount: 1 };
+    seen[k] = copy;
+    out.push(r);
+  });
+  return out;
+}
+
+// 같은 과목을 다르게 적은 것(고물II / 고금물리학II / 고급물리학II, 일반물리학1 /
+// 물리학1 …)까지 갈라지면 "문제 없음 / 해설 없음"만 잔뜩 생기므로, 끝에 붙은
+// 숫자가 같고 이름이 서로의 축약형(부분수열)이거나 한 글자 차이(오타)면 합친다.
+function splitTrailingNum(s) {
+  var m = /^(.*?)([1-4])$/.exec(s);
+  return m ? [m[1], m[2]] : [s, ''];
+}
+function isSubsequence(a, b) { // a가 b의 부분수열인가 (고물 ⊂ 고급물리학)
+  var i = 0;
+  for (var j = 0; j < b.length && i < a.length; j++) if (a[i] === b[j]) i++;
+  return i === a.length;
+}
+function editDistance1(a, b) { // 한 글자 이내 차이인가 (고금 vs 고급)
+  if (Math.abs(a.length - b.length) > 1) return false;
+  var i = 0, j = 0, diff = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++diff > 1) return false;
+    if (a.length > b.length) i++;
+    else if (a.length < b.length) j++;
+    else { i++; j++; }
+  }
+  return diff + (a.length - i) + (b.length - j) <= 1;
+}
+function sameSubject(k1, k2) {
+  var a = splitTrailingNum(k1), b = splitTrailingNum(k2);
+  if (a[1] !== b[1]) return false; // 뒤 숫자가 다르면 다른 과목(고급물리학1 vs 2)
+  var x = a[0], y = b[0];
+  if (!x || !y) return false;
+  return isSubsequence(x, y) || isSubsequence(y, x) || editDistance1(x, y);
+}
+
+function clusterGroup(group) {
+  // 세부과목(파일명 속 과목 표기)이 서로 다르면 파일 개수와 상관없이 항상 나눈다.
+  // "문제 1 / 문제 2"처럼 보이지만 실은 고전문학과 현대문학처럼 서로 다른
+  // 시험인 경우가 있어서, 중복처럼 보이는 걸 막으려면 무조건 라벨을 붙여야 함.
+  var buckets = {};
+  group.forEach(function (r) {
+    var norm = normDetail(r.subject_detail) || '__etc__';
+    if (!buckets[norm]) buckets[norm] = { label: r.subject_detail || '기타', records: [] };
+    buckets[norm].records.push(r);
+  });
+
+  // 별칭끼리 병합 (가장 파일이 많은 표기를 대표 이름으로)
+  var keys = Object.keys(buckets);
+  var merged = [];
+  keys.forEach(function (k) {
+    if (k === '__etc__') { merged.push({ keys: [k] }); return; }
+    for (var i = 0; i < merged.length; i++) {
+      if (merged[i].keys[0] !== '__etc__' && sameSubject(k, merged[i].keys[0])) {
+        merged[i].keys.push(k);
+        return;
+      }
+    }
+    merged.push({ keys: [k] });
+  });
+  if (merged.length <= 1) return null; // 결국 다 같은 과목이면 나눌 의미 없음
+
+  return merged.map(function (m) {
+    var recs = [], best = null;
+    m.keys.forEach(function (k) {
+      recs = recs.concat(buckets[k].records);
+      if (!best || buckets[k].records.length > buckets[best].records.length) best = k;
+    });
+    return { label: buckets[best].label, records: recs };
+  }).sort(function (a, b) { return b.records.length - a.records.length; });
+}
+
+// ---- 분류 탭 ----
+function buildCats() {
+  var counts = {};
+  DATA.forEach(function (r) {
+    var c = r.category || '(미분류)';
+    counts[c] = (counts[c] || 0) + 1;
+  });
+  var present = Object.keys(counts);
+  present.sort(function (a, b) {
+    var ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
+    if (ia < 0) ia = 99; if (ib < 0) ib = 99;
+    return ia - ib || a.localeCompare(b, 'ko');
+  });
+
+  var box = document.getElementById('cats');
+  box.innerHTML = '';
+
+  var all = document.createElement('div');
+  all.className = 'cat' + (state.cat === null ? ' on' : '');
+  all.innerHTML = '전체<span class="n">' + DATA.length + '</span>';
+  all.onclick = function () { state.cat = null; render(); };
+  box.appendChild(all);
+
+  present.forEach(function (c) {
+    var el = document.createElement('div');
+    el.className = 'cat' + (state.cat === c ? ' on' : '');
+    el.innerHTML = c + '<span class="n">' + counts[c] + '</span>';
+    el.onclick = function () { state.cat = (state.cat === c ? null : c); render(); };
+    box.appendChild(el);
+  });
+}
+
+// ---- 렌더 ----
+function render() {
+  buildCats();
+
+  var rows = DATA.filter(function (r) {
+    if (isHidden(r)) return false;   // 중복이라 직접 숨긴 파일
+    if (state.cat && (r.category || '(미분류)') !== state.cat) return false;
+    if (state.flagOnly && !isFlagged(r)) return false;
+    if (state.favOnly && !isFavorite(r.category, r.subject)) return false;
+    return matchesQuery(r, state.q);
+  });
+
+  // 데이터 생성 시각을 같이 보여준다 - 브라우저가 data.js를 캐시해서 옛날 걸
+  // 보고 있는 경우를 바로 알아채려고 (안 바뀐 것 같으면 Ctrl+Shift+R)
+  var ver = (typeof EXAM_DATA_VERSION !== 'undefined') ? EXAM_DATA_VERSION : null;
+  document.getElementById('status').textContent =
+    rows.length + '개 파일 표시 중 (전체 ' + DATA.length + '개)' +
+    (ver ? '  ·  데이터 ' + ver : '');
+
+  // 직접 숨긴 파일이 있으면 알려주고, 되돌리거나 삭제 목록으로 내보낼 수 있게 한다
+  var hiddenIds = Object.keys(hidden);
+  var note = document.getElementById('hiddennote');
+  if (hiddenIds.length) {
+    note.style.display = 'block';
+    note.innerHTML = '';
+    note.appendChild(document.createTextNode(
+      '중복이라고 직접 숨긴 파일 ' + hiddenIds.length + '개 (이 브라우저에만 적용됨)'));
+    var undo = document.createElement('button');
+    undo.textContent = '모두 되돌리기';
+    undo.onclick = function () { unhideAll(); render(); };
+    note.appendChild(undo);
+    var exp = document.createElement('button');
+    exp.textContent = '삭제 목록으로 내보내기';
+    exp.title = '숨긴 파일들을 to_delete.txt로 저장 - delete_files.py로 넘기면 드라이브 휴지통으로 갑니다';
+    exp.onclick = function () { exportDeleteList(hiddenIds.map(function (id) {
+      return { id: id, filename: hidden[id].filename };
+    })); };
+    note.appendChild(exp);
+  } else {
+    note.style.display = 'none';
+  }
+
+  var out = document.getElementById('out');
+  out.innerHTML = '';
+  var emptyEl = document.getElementById('empty');
+  if (!rows.length) {
+    emptyEl.style.display = 'block';
+    if (state.favOnly && !hasAnyFavorite()) {
+      emptyEl.innerHTML = '즐겨찾기한 과목이 없습니다.<br>과목 이름 옆 ☆를 눌러 추가하거나, ' +
+        '<a href="#" id="showall">전체 보기로 전환</a>하세요.';
+      var showAll = document.getElementById('showall');
+      if (showAll) {
+        showAll.addEventListener('click', function (e) {
+          e.preventDefault();
+          state.favOnly = false;
+          saveFavOnly(false);
+          document.getElementById('favbtn').className = '';
+          render();
+        });
+      }
+    } else {
+      emptyEl.textContent = '해당하는 자료가 없습니다.';
+    }
+    updateSelectionBar();
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  // 분류 > 과목 > 시험 으로 묶기
+  var byCat = {};
+  rows.forEach(function (r) {
+    var c = r.category || '(미분류)';
+    var s = r.subject || '(과목 미상)';
+    byCat[c] = byCat[c] || {};
+    byCat[c][s] = byCat[c][s] || {};
+    var k = examKey(r);
+    (byCat[c][s][k] = byCat[c][s][k] || []).push(r);
+  });
+
+  var catNames = Object.keys(byCat).sort(function (a, b) {
+    var ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
+    if (ia < 0) ia = 99; if (ib < 0) ib = 99;
+    return ia - ib || a.localeCompare(b, 'ko');
+  });
+
+  catNames.forEach(function (cName) {
+    // 분류를 이미 탭으로 고른 상태면 분류 제목은 생략
+    if (!state.cat && catNames.length > 1) {
+      var h = document.createElement('div');
+      h.style.cssText = 'margin:24px 0 2px;font-size:13px;letter-spacing:.08em;color:var(--ink-soft);';
+      h.textContent = cName.toUpperCase();
+      out.appendChild(h);
+    }
+
+    var subjects = Object.keys(byCat[cName]).sort(function (a, b) {
+      return a.localeCompare(b, 'ko');
+    });
+
+    subjects.forEach(function (sName) {
+      var exams = byCat[cName][sName];
+      var keys = Object.keys(exams);
+
+      // 연도 내림차순 → 학기 → 중간/기말
+      keys.sort(function (a, b) {
+        var A = a.split('|'), B = b.split('|');
+        if (A[1] !== B[1]) return (B[1] || '').localeCompare(A[1] || '');
+        if (A[2] !== B[2]) return (A[2] || '').localeCompare(B[2] || '');
+        var rank = function (t) { return t && t.indexOf('중간') >= 0 ? 0 : 1; };
+        return rank(A[3]) - rank(B[3]);
+      });
+
+      var fileCount = 0;
+      keys.forEach(function (k) { fileCount += exams[k].length; });
+
+      var det = document.createElement('details');
+      det.className = 'subject';
+      // 검색 중이거나 결과가 적으면 자동으로 펼침
+      if (state.q || state.flagOnly || rows.length <= 60) det.open = true;
+
+      var sum = document.createElement('summary');
+      sum.innerHTML =
+        '<span class="subj-name"></span>' +
+        '<span class="subj-meta">' + keys.length + '개 시험 · ' + fileCount + '개 파일</span>' +
+        '<span class="star" title="즐겨찾기">' + (isFavorite(cName, sName) ? '★' : '☆') + '</span>';
+      sum.querySelector('.subj-name').textContent = sName;
+      var starEl = sum.querySelector('.star');
+      if (isFavorite(cName, sName)) starEl.className = 'star on';
+      starEl.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFavorite(cName, sName);
+        render();
+      });
+      det.appendChild(sum);
+
+      var body = document.createElement('div');
+      body.className = 'subj-body';
+
+      keys.forEach(function (k) {
+        var groupAll = exams[k];
+        // 내용이 같은 파일이 두 벌 들어있는 경우(동명 폴더) 하나만 보여준다
+        var group = dedupeRecords(groupAll);
+        var dupHidden = groupAll.length - group.length;
+        var first = group[0];
+
+        var etc = group.filter(function (r) {
+          return !isProblem(r.doctype) && !isSolution(r.doctype);
+        });
+
+        var row = document.createElement('div');
+        row.className = 'exam';
+
+        var label = document.createElement('div');
+        label.className = 'exam-label';
+
+        var when = document.createElement('div');
+        when.className = 'exam-when';
+        if (first.year) {
+          var y = document.createElement('span');
+          y.className = 'yr'; y.textContent = first.year;
+          when.appendChild(y);
+        } else {
+          var u = document.createElement('span');
+          u.className = 'unknown'; u.textContent = '연도 미상';
+          when.appendChild(u);
+        }
+        var tail = [first.semester ? first.semester + '학기' : null, first.examtype]
+          .filter(Boolean).join(' ');
+        if (tail) when.appendChild(document.createTextNode('  ' + tail));
+
+        if (group.some(function (r) { return r.folder_mismatch; })) {
+          var f1 = document.createElement('span');
+          // 데이터가 틀렸다는 게 아니라 "드라이브에서 엉뚱한 이름의 폴더에
+          // 들어있다"는 뜻이라 경고색 대신 흐리게 표시한다. 실제로 PDF 표지까지
+          // 대조해본 결과 대부분(92/115) 여기 보이는 값이 맞고 폴더 이름만 틀렸음.
+          f1.className = 'flag muted'; f1.textContent = '폴더 위치 다름';
+          f1.title = '여기 보이는 연도·학기·시험종류는 시험지 표지 기준으로 맞음. '
+            + '다만 드라이브에서는 이름이 다른 폴더(예: "1학기 중간고사")에 들어가 있어서 '
+            + '드라이브 정리가 필요하다는 표시임';
+          when.appendChild(f1);
+        }
+        if (dupHidden > 0) {
+          var f2 = document.createElement('span');
+          f2.className = 'flag dup'; f2.textContent = '중복 ' + dupHidden + '개 숨김';
+          f2.title = '드라이브에 같은 파일이 두 벌 올라와 있어서(같은 이름의 폴더가 2개) 하나만 표시함. 내용 해시로 확인한 결과 완전히 동일한 파일임';
+          when.appendChild(f2);
+        } else if (group.some(function (r) { return r.duplicate_sibling_folder; })) {
+          var f2b = document.createElement('span');
+          f2b.className = 'flag'; f2b.textContent = '동명 폴더';
+          f2b.title = '같은 이름의 형제 폴더가 2개 있는데, 이 시험 파일들은 서로 내용이 달라서 합치지 않았음';
+          when.appendChild(f2b);
+        }
+        if (group.some(function (r) { return !r.parsed_ok; })) {
+          var f3 = document.createElement('span');
+          f3.className = 'flag'; f3.textContent = '미분류';
+          when.appendChild(f3);
+        }
+
+        // 뭔가 표시가 붙은 줄이면 "확인함" 버튼을 준다 - 눌러두면 "정리 필요만"
+        // 목록에서 빠진다(데이터를 고치는 게 아니라 내가 확인했다는 표시)
+        if (group.some(isFlagged) || isReviewed(k)) {
+          var rv = document.createElement('button');
+          var done = isReviewed(k);
+          rv.className = 'reviewbtn' + (done ? ' on' : '');
+          rv.textContent = done ? '확인함 ✓' : '확인함';
+          rv.title = done
+            ? '다시 누르면 "정리 필요" 목록에 도로 넣습니다'
+            : '이 시험은 확인이 끝났다고 표시합니다 - "정리 필요만" 목록에서 빠집니다';
+          rv.addEventListener('click', function () {
+            markReviewed(k, !isReviewed(k));
+            render();
+          });
+          when.appendChild(rv);
+        }
+        label.appendChild(when);
+
+        var fn = document.createElement('div');
+        fn.className = 'exam-files';
+        fn.textContent = group.map(function (r) { return r.filename; }).join('   ·   ');
+        label.appendChild(fn);
+
+        // 문제/해설로 분류 안 되는 파일은 따로 링크로
+        if (etc.length) {
+          var ex = document.createElement('div');
+          ex.className = 'extra';
+          etc.forEach(function (r) {
+            var w = document.createElement('span');
+            w.className = 'btn-wrap';
+            w.appendChild(makeCheckbox(r));
+            var a = document.createElement('a');
+            a.href = r.url; a.target = '_blank'; a.rel = 'noopener';
+            a.textContent = (r.doctype || '기타') + ' 열기';
+            w.appendChild(a);
+            ex.appendChild(w);
+          });
+          label.appendChild(ex);
+        }
+
+        row.appendChild(label);
+
+        function addBtns(list, cls, text, container) {
+          if (!list.length) {
+            var none = document.createElement('span');
+            none.className = 'btn-none';
+            none.textContent = text + ' 없음';
+            container.appendChild(none);
+            return;
+          }
+          list.forEach(function (r, i) {
+            var wrap = document.createElement('span');
+            wrap.className = 'btn-wrap';
+            wrap.appendChild(makeCheckbox(r));
+            var a = document.createElement('a');
+            a.className = 'btn ' + cls;
+            a.href = r.url; a.target = '_blank'; a.rel = 'noopener';
+            a.textContent = list.length > 1 ? text + ' ' + (i + 1) : text;
+            wrap.appendChild(a);
+            // 문제1/문제2처럼 같은 게 두 개 뜰 때, 실제로 같은 파일이면 하나를 숨긴다
+            if (list.length > 1) {
+              var x = document.createElement('button');
+              x.className = 'hidebtn';
+              x.textContent = '×';
+              x.title = '이건 위 파일과 같은 자료라서 숨기기 (드라이브 파일은 그대로 있음)';
+              x.addEventListener('click', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                hideFile(r);
+                render();
+              });
+              wrap.appendChild(x);
+            }
+            container.appendChild(wrap);
+          });
+        }
+
+        var clusters = clusterGroup(group);
+        if (!clusters) {
+          // 평소 경우: 문제/해설 버튼 한 줄
+          var btns = document.createElement('div');
+          btns.className = 'btns';
+          addBtns(group.filter(function (r) { return isProblem(r.doctype); }), 'q', '문제', btns);
+          addBtns(group.filter(function (r) { return isSolution(r.doctype); }), 'a', '해설', btns);
+          row.appendChild(btns);
+        } else {
+          // 한 시험에 파일이 너무 많이 몰린 경우(예: "문학"에 고전/현대문학이 섞임) -
+          // 파일명 속 세부과목별로 미니 줄을 나눠서 보여준다 (페어링 자체는 그대로)
+          row.className = 'exam exam-clustered';
+          var btnsWrap = document.createElement('div');
+          btnsWrap.className = 'btns-clustered';
+          clusters.forEach(function (c) {
+            var mini = document.createElement('div');
+            mini.className = 'mini-cluster';
+            var miniLabel = document.createElement('span');
+            miniLabel.className = 'mini-label';
+            miniLabel.textContent = c.label;
+            mini.appendChild(miniLabel);
+            var mbtns = document.createElement('div');
+            mbtns.className = 'btns';
+            addBtns(c.records.filter(function (r) { return isProblem(r.doctype); }), 'q', '문제', mbtns);
+            addBtns(c.records.filter(function (r) { return isSolution(r.doctype); }), 'a', '해설', mbtns);
+            mini.appendChild(mbtns);
+            btnsWrap.appendChild(mini);
+          });
+          row.appendChild(btnsWrap);
+        }
+
+        body.appendChild(row);
+      });
+
+      det.appendChild(body);
+      out.appendChild(det);
+    });
+  });
+
+  updateSelectionBar();
+}
+
+document.getElementById('q').addEventListener('input', function (e) {
+  state.q = e.target.value.trim();
+  render();
+});
+document.getElementById('flagbtn').addEventListener('click', function () {
+  state.flagOnly = !state.flagOnly;
+  this.className = state.flagOnly ? 'on' : '';
+  render();
+});
+
+var favbtn = document.getElementById('favbtn');
+favbtn.className = state.favOnly ? 'on' : '';
+favbtn.addEventListener('click', function () {
+  state.favOnly = !state.favOnly;
+  saveFavOnly(state.favOnly);
+  this.className = state.favOnly ? 'on' : '';
+  render();
+});
+
+document.getElementById('clearSelBtn').addEventListener('click', function () {
+  state.selected = {};
+  render();
+});
+
+// 선택한 파일들의 "드라이브 파일ID + 파일명"을 텍스트로 저장한다.
+// 이 페이지는 읽기 전용이라 여기서 직접 지우지 않는다 - 저장된 목록을
+// delete_files.py에 넘기면 확인 절차를 거쳐 드라이브 휴지통으로 옮긴다.
+document.getElementById('deleteListBtn').addEventListener('click', function () {
+  var ids = Object.keys(state.selected);
+  if (!ids.length) return;
+  exportDeleteList(ids.map(function (id) { return state.selected[id]; }));
+});
+document.getElementById('downloadBtn').addEventListener('click', function () {
+  var ids = Object.keys(state.selected);
+  if (!ids.length) return;
+  // <a target=_blank>를 여러 개 연달아 클릭하면 두 번째부터는 브라우저가
+  // "사용자 조작 없이 새 창을 여는 것"으로 보고 팝업을 막는 경우가 많음.
+  // 숨긴 iframe으로 다운로드 링크를 열면 팝업 취급을 안 받고, 페이지 이동도
+  // 안 일어나서(다운로드 응답이라 네비게이션이 안 됨) 더 안전함.
+  ids.forEach(function (id, i) {
+    setTimeout(function () {
+      var iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = downloadUrl(id);
+      document.body.appendChild(iframe);
+      setTimeout(function () { document.body.removeChild(iframe); }, 15000);
+    }, i * 500);
+  });
+});
+
+render();
+</script>
+</body>
+</html>

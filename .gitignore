@@ -1,0 +1,16 @@
+# ---- 구글 인증 정보 (절대 올리면 안 됨) ----
+credentials.json
+token.json
+token_write.json
+
+# ---- 삭제 작업 부산물 ----
+to_delete.txt
+delete_log.jsonl
+
+# ---- 원자료 백업 (사이트엔 data.js만 쓰임) ----
+data.json
+
+# ---- 기타 ----
+__pycache__/
+*.pyc
+.claude/
