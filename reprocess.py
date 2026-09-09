@@ -33,6 +33,7 @@ for r in old:
         rec[key] = r.get(key)
     records.append(rec)
 
+crawl.fill_missing_categories(records)
 crawl.canonicalize_subjects(records)
 
 stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")

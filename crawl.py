@@ -41,8 +41,15 @@ from googleapiclient.discovery import build
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
-# 기출문제 최상위 폴더 ID (12개 분류 - 국어/물리/사회/... - 를 담고 있는 폴더)
-ROOT_FOLDER_ID = "1_W8bDBPF5zGU3B9JuAt5g2Ycsjq7VpkH"
+# 기출문제 최상위 폴더들.
+# 드라이브에 서로 다른 최상위 폴더가 두 개 있다("지필고사", "기말고사 기출").
+# 처음엔 "지필고사"만 훑었는데, 그 바람에 기말고사 문제지/해설이 통째로 빠져서
+# 사이트에 "문제 없음 / 해설 없음"으로 뜨는 시험이 68개나 있었다.
+# 두 폴더는 내용이 일부 겹치므로(약 900개), 겹치는 건 화면에서 합쳐서 보여준다.
+ROOT_FOLDERS = [
+    ("지필고사", "1_W8bDBPF5zGU3B9JuAt5g2Ycsjq7VpkH"),
+    ("기말고사 기출", "11A09DJOktS1l6f3ilFuGdGF5ZnZHpSxO"),
+]
 
 # ---- 파일명 패턴 ----------------------------------------------------------
 # 실제 4234개 데이터로 검증한 결과, 실패 사례의 69%는 파일명이 유니코드 NFD
@@ -229,6 +236,18 @@ MANUAL_OVERRIDES = {
     "1o-qc8mJZBm4IWdfO_1OCQp2yQbG80d4G": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
     "1OZcoDRJFdi-abXSihZEEQzzHeriHft5I": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
 
+    # 아래 6개는 파일명 형식이 하나뿐이라 정규식을 새로 만들 값어치가 없고,
+    # 화면에 뜨는 값은 이미 정확해서 "확정"으로만 표시한다(미분류 딱지 제거).
+    #   "2014_계절학기기말_..."  계절학기 표기라 학기 숫자가 없음
+    #   "..._(추상대수학2)_2022_2_중간"  연도와 학기 사이가 언더스코어
+    #   "일반물리학 2011년도 1학기 기말고사-모법답안"  띄어쓰기 자유형
+    "1EsPvEv-BbU1o-_sJUiTavjRsXszXWclS": {"year": "2014", "semester": "2", "examtype": "기말고사", "doctype": "문제지"},
+    "1np-CdsIsRzY_3K2myjL6Hl2ts8GhCBUl": {"year": "2014", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
+    "1nBIcgbakGBi-Ch5h1a7Wy_RG3ObGmNAT": {"year": "2022", "semester": "2", "examtype": "중간고사", "doctype": "문제지"},
+    "1E34-k4c9HqWKNwtXszLGC1QEhZ5kFftw": {"year": "2022", "semester": "2", "examtype": "중간고사", "doctype": "모범답안및해설"},
+    "1aepjRt-jVRIC9hCVBuPwZu8njyUbVHVv": {"year": "2011", "semester": "1", "examtype": "기말고사", "doctype": "문제지"},
+    "1F9JnpG2K8tWgJj8tXfFOKlPZsm6wKcIc": {"year": "2011", "semester": "1", "examtype": "기말고사", "doctype": "모범답안및해설"},
+
     # "해설 없음/문제 없음"으로 뜨는 줄을 확인하다 나온 오류 2건.
     # 파일명엔 2기말이라 적혀 있지만 표지는 1학기 기말이었고, 같은 시험의 문제지가
     # 1기말로 따로 떨어져 있어서 짝이 깨져 보였던 경우.
@@ -300,6 +319,10 @@ MANUAL_OVERRIDES = {
 
 
 def parse_filename(filename):
+    # 확장자가 빠진 파일이 꽤 많다(예: "2024_1기말_과학사_문제지"). 아래 패턴들이
+    # 전부 ".pdf"로 끝나도록 돼 있어서, 없으면 붙여서 맞춰본다.
+    if not filename.lower().endswith(".pdf"):
+        filename = filename + ".pdf"
     for pat in PATTERNS:
         m = pat.match(filename)
         if m:
@@ -371,6 +394,92 @@ def derive_subject(folder_path, category):
     return category
 
 
+# "기말고사 기출" 쪽 경로 판별과 과목 추출.
+# 경로가 "1학기 기말고사 기출 / 기본선택 / 물리학3 / 문제지" 처럼 생겨서,
+# 분류(국어/물리/…)가 아예 없고 대신 이수 구분(기본선택/심화선택/N학년)이 온다.
+# 과목은 문서유형·연도 폴더를 뺀 마지막 칸이다.
+SECOND_ROOT_HEAD_RE = re.compile(r"\d\s*학기\s*(중간|기말)고사\s*기출")
+SECOND_ROOT_TRACK_RE = re.compile(r"^(기본선택|심화선택|기본필수|심화필수|공통|\d학년)$")
+
+
+def derive_subject_second_root(folder_path):
+    for seg in reversed(folder_path[1:]):
+        s = seg.strip()
+        if SUBJECT_SKIP_DOCTYPE_RE.match(s):
+            continue
+        if SUBJECT_SKIP_YEARRANGE_RE.match(s):
+            continue
+        if SECOND_ROOT_TRACK_RE.match(s):
+            continue
+        return re.sub(r"\s+", " ", s)
+    return None
+
+
+def fill_missing_categories(records):
+    """분류가 없는 기록(기말고사 기출 쪽)을 과목 이름으로 채운다.
+    지필고사 쪽에서 이미 '이 과목은 이 분류'라는 걸 알고 있으므로 그걸 쓴다."""
+    from collections import Counter, defaultdict
+
+    votes = defaultdict(Counter)
+    for r in records:
+        if r.get("category") and r.get("subject"):
+            votes[norm_subject(r["subject"])][r["category"]] += 1
+    table = {k: c.most_common(1)[0][0] for k, c in votes.items()}
+
+    # 같은 과목인데 이름이 조금씩 다르게 적힌 경우가 많아서(현대문학은 "문학"
+    # 안의 세부과목, 기초통계학=확률과통계, "창융특 고체물리"=고체물리,
+    # 생명과학3(2학년)=생명과학3 …) 단계적으로 느슨하게 맞춰본다.
+    detail_votes = defaultdict(Counter)
+    for r in records:
+        if r.get("category") and r.get("subject_detail"):
+            detail_votes[norm_subject(r["subject_detail"])][r["category"]] += 1
+    detail_table = {k: c.most_common(1)[0][0] for k, c in detail_votes.items()}
+
+    def lookup(subject):
+        cands = [subject]
+        # "창융특 고체물리" / "창의융합특강 고체물리" 처럼 묶음 이름이 앞에 붙은 경우
+        for pre in ("창융특", "창의융합특강"):
+            if subject.startswith(pre):
+                cands.append(subject[len(pre):].strip())
+        # "생명과학3(2학년)" 처럼 괄호 설명이 붙은 경우
+        cands.append(re.sub(r"\([^)]*\)", "", subject).strip())
+        for c in cands:
+            k = norm_subject(c)
+            if k in table:
+                return table[k]
+            if k in detail_table:      # 세부과목 이름으로도 찾아본다(현대문학 등)
+                return detail_table[k]
+        # 마지막으로 부분 일치 (고급지구과학 ⊂ 고급지구과학1,2)
+        k = norm_subject(subject)
+        for known, cat in table.items():
+            if k and (k in known or known in k):
+                return cat
+        return None
+
+    filled = unknown = 0
+    for r in records:
+        if r.get("category") or not r.get("subject"):
+            continue
+        cat = lookup(r["subject"])
+        if cat:
+            r["category"] = cat
+            filled += 1
+        else:
+            r["category"] = "(분류 미상)"
+            unknown += 1
+    return filled, unknown
+
+
+def norm_subject(s):
+    """과목 이름 비교용 정규화 - 띄어쓰기와 로마숫자 표기 차이를 없앤다."""
+    s = re.sub(r"\s+", "", s or "")
+    # 긴 것부터 바꿔야 한다. "I"를 먼저 바꾸면 "II"가 "11"이 돼버림.
+    for a, b in (("Ⅳ", "4"), ("Ⅲ", "3"), ("Ⅱ", "2"), ("Ⅰ", "1"),
+                 ("IV", "4"), ("III", "3"), ("II", "2"), ("I", "1")):
+        s = s.replace(a, b)
+    return s
+
+
 def canonicalize_subjects(records):
     """'우주론 I'과 '우주론I'처럼 띄어쓰기만 다른 과목을 한 이름으로 합친다.
     표기는 실제로 가장 많이 쓰인 쪽을 대표로 삼는다(이름을 임의로 뭉개지 않음)."""
@@ -403,9 +512,17 @@ def parse_record(filename, folder_path, drive_id):
         if isinstance(v, str):
             fname_meta[k] = v.strip()
 
-    # folder_path[0] = 분류(국어/물리/수학/...), 과목은 구조가 분류마다 달라서 derive_subject로 뽑는다
-    category = folder_path[0] if len(folder_path) > 0 else None
-    subject = derive_subject(folder_path, category) if category else None
+    # 두 최상위 폴더의 구조가 다르다.
+    #   지필고사      : 분류(국어/물리/…) / 과목 / N학기 X고사 / …   → 맨 앞이 분류
+    #   기말고사 기출 : N학기 기말고사 기출 / 기본선택 / 과목 / 문제지 → 분류가 없음
+    # 후자는 경로에 분류가 아예 없어서, 과목만 뽑아두고 분류는 나중에
+    # (지필고사에서 얻은 과목→분류 대응표로) 채운다.
+    if folder_path and SECOND_ROOT_HEAD_RE.search(folder_path[0]):
+        category = None
+        subject = derive_subject_second_root(folder_path)
+    else:
+        category = folder_path[0] if len(folder_path) > 0 else None
+        subject = derive_subject(folder_path, category) if category else None
     folder_semester, folder_examtype = folder_semester_examtype(folder_path)
 
     fname_semester = fname_meta.get("semester")
@@ -581,7 +698,15 @@ def main():
     print("드라이브 인증 중... (브라우저 창이 열립니다)")
     service = get_service()
     print("크롤링 시작... (파일 수에 따라 몇 분 걸릴 수 있음)")
-    records = crawl(service, ROOT_FOLDER_ID, [])
+    records = []
+    for label, root_id in ROOT_FOLDERS:
+        print(f"  [{label}] 훑는 중...")
+        got = crawl(service, root_id, [])
+        print(f"  [{label}] {len(got)}개")
+        records.extend(got)
+    filled, unknown = fill_missing_categories(records)
+    if filled or unknown:
+        print(f"  분류가 없던 기록 {filled}개는 과목 이름으로 채움, {unknown}개는 못 찾음")
     canonicalize_subjects(records)
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(records, f, ensure_ascii=False, indent=2)
