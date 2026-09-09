@@ -229,6 +229,12 @@ MANUAL_OVERRIDES = {
     "1o-qc8mJZBm4IWdfO_1OCQp2yQbG80d4G": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
     "1OZcoDRJFdi-abXSihZEEQzzHeriHft5I": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
 
+    # "해설 없음/문제 없음"으로 뜨는 줄을 확인하다 나온 오류 2건.
+    # 파일명엔 2기말이라 적혀 있지만 표지는 1학기 기말이었고, 같은 시험의 문제지가
+    # 1기말로 따로 떨어져 있어서 짝이 깨져 보였던 경우.
+    "1T0uvRXPiZwyu2HC1D0hI6VsB7q3AfO_T": {"semester": "1"},   # 2011_2기말_지구과학I_모범답안및해설
+    "1zYVeM-kjC2HrjWw4JfP3_WcHTQcZdcmb": {"semester": "1"},   # 2022_2기말_커뮤니케이션_모범답안및해설
+
     # "폴더 불일치"로 걸린 것들을 마저 확인하다 나온 오류 2건
     # (2011_1중간_기말_세포.pdf 는 파일명에 "중간"과 "기말"이 같이 들어있어
     #  파서가 "중간"을 먼저 잡았는데, 표지는 기말고사였음)
@@ -435,6 +441,15 @@ def parse_record(filename, folder_path, drive_id):
     )
 
     doctype = fname_meta.get("doctype")
+    # 정규식이 잡은 doctype이 실제 문서유형 단어가 아닐 때가 있다. 예를 들어
+    # "2024_2기말_창융특XXVII_일반상대론_문제지.pdf"는 칸이 하나 더 많아서
+    # doctype 자리에 과목명("일반상대론")이 들어간다. 파일명 안에 문서유형
+    # 단어가 분명히 보이면 그걸 우선한다.
+    if not doctype or not any(w in doctype for w in ("문제", "답안", "해설", "정답")):
+        kw = next((k for k in DOCTYPE_KEYWORDS if k in filename), None)
+        if kw:
+            doctype = kw
+
     if doctype is None:
         for seg in folder_path:
             if "문제지" in seg:
