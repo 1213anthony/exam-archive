@@ -46,9 +46,17 @@ SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 # 처음엔 "지필고사"만 훑었는데, 그 바람에 기말고사 문제지/해설이 통째로 빠져서
 # 사이트에 "문제 없음 / 해설 없음"으로 뜨는 시험이 68개나 있었다.
 # 두 폴더는 내용이 일부 겹치므로(약 900개), 겹치는 건 화면에서 합쳐서 보여준다.
+# layout이 "분류먼저"면 경로 맨 앞이 분류(국어/물리/…)이고, "분류없음"이면
+# 경로에 분류가 아예 없이 학년/이수구분부터 시작한다. 후자는 과목만 뽑아두고
+# 분류는 나중에 과목 이름으로 채운다.
 ROOT_FOLDERS = [
-    ("지필고사", "1_W8bDBPF5zGU3B9JuAt5g2Ycsjq7VpkH"),
-    ("기말고사 기출", "11A09DJOktS1l6f3ilFuGdGF5ZnZHpSxO"),
+    ("지필고사", "1_W8bDBPF5zGU3B9JuAt5g2Ycsjq7VpkH", "분류먼저"),
+    ("기말고사 기출", "11A09DJOktS1l6f3ilFuGdGF5ZnZHpSxO", "분류없음"),
+    ("1학기 중간고사 기출", "1HdeYJ-aU2hpW9RT8UucU1hA2pcSKu0ka", "분류없음"),
+    ("2학기 중간고사 기출", "1FZiTWiy5zBNzHIUiYwvADrrFWJpT7lT6", "분류없음"),
+    ("2025년 1학기 중간 기출", "1LoLd3D3dAzc9zcP9skeBmKkbFPYd2aay", "분류없음"),
+    ("1학기 기말_2025", "1dIYSJoBWbDI6mTwk0dStwsThR_LMv7BF", "분류없음"),
+    ("2024_1학기_중간", "1qpaBwkvue-KIvRyhsbHVHk2yTusFYm4t", "분류없음"),
 ]
 
 # ---- 파일명 패턴 ----------------------------------------------------------
@@ -163,6 +171,28 @@ DOCTYPE_KEYWORDS = [
     # 넓은 catch-all - 위의 구체적인 키워드가 먼저 매칭되므로 순서상 안전함
     "답안", "문제",
 ]
+
+# 같은 것을 다르게 부른 이름들. 화면에서는 doctype에 "문제"나 "답안/해설"이
+# 들어있어야 문제지/해설 버튼으로 잡히는데, 아래 표기들은 그 글자가 없어서
+# 짝이 있는데도 "문제 없음 / 해설 없음"으로 뜨고 있었다.
+DOCTYPE_SYNONYMS = {
+    "원안": "문제지",            # 시험 원안 = 문제지
+    "시험지": "문제지",
+    "논서술형채점기준표": "모범답안및해설",
+    "논술형채점기준표": "모범답안및해설",
+    "채점기준표": "모범답안및해설",
+}
+
+
+def normalize_doctype(doctype):
+    if not doctype:
+        return doctype
+    if doctype in DOCTYPE_SYNONYMS:
+        return DOCTYPE_SYNONYMS[doctype]
+    for word, canon in DOCTYPE_SYNONYMS.items():
+        if word in doctype:
+            return canon
+    return doctype
 
 
 # ---- 파일 내용 해시 캐시 ---------------------------------------------------
@@ -434,9 +464,19 @@ def folder_semester_examtype(folder_path):
 # 처음 나오는 "진짜 이름"을 과목으로 쓴다.
 SUBJECT_SKIP_EXAM_RE = re.compile(r"\d\s*학기\s*(중간|기말)")
 SUBJECT_SKIP_DOCTYPE_RE = re.compile(r"^(문제지|모범\s*답안.*|정답.*|해설.*)$")
-SUBJECT_SKIP_YEARRANGE_RE = re.compile(r"^\d{4}\s*년")
+# "2011년~2014년"뿐 아니라 "2015-2019", "2011-2019", "2015~2021년"처럼
+# 년을 안 붙인 연도범위 폴더도 과목이 아니다.
+SUBJECT_SKIP_YEARRANGE_RE = re.compile(r"^\d{4}\s*(년|[-~–])")
 # 폴더에서 실제로 쓰이는 분류 축약어(과목명이 아니라 묶음 폴더)
 CATEGORY_ALIASES = {"창의융합특강": ["창융특"]}
+
+# "지필고사" 폴더 맨 앞에 오는 12개 분류. 경로 맨 앞이 이 중 하나가 아니면
+# (학년/이수구분/시험회차 같은 것이면) 분류가 없는 구조로 본다.
+CATEGORY_NAMES = [
+    "국어", "수학", "물리", "화학", "생명과학", "지구과학",
+    "정보", "사회", "외국어", "실험", "예체능", "창의융합특강", "창융특",
+]
+CATEGORY_NAME_RE = re.compile(r"^(" + "|".join(CATEGORY_NAMES) + r")$")
 
 
 def derive_subject(folder_path, category):
@@ -468,13 +508,25 @@ SECOND_ROOT_TRACK_RE = re.compile(r"^(기본선택|심화선택|기본필수|심
 
 
 def derive_subject_second_root(folder_path):
-    for seg in reversed(folder_path[1:]):
+    """분류가 없는 폴더 구조에서 과목을 뽑는다.
+    '3학년 / 세계사 / 모범 답안 및 해설' 처럼 학년·문서유형·연도범위 폴더가
+    섞여 있으므로 뒤에서부터 그것들을 건너뛰고 처음 나오는 이름을 쓴다.
+    폴더에 과목이 아예 없는 경우(파일명에만 있는 경우)는 None을 돌려주고,
+    호출한 쪽에서 파일명에서 뽑은 과목을 쓴다."""
+    for seg in reversed(folder_path):
         s = seg.strip()
+        if not s:
+            continue
         if SUBJECT_SKIP_DOCTYPE_RE.match(s):
             continue
         if SUBJECT_SKIP_YEARRANGE_RE.match(s):
             continue
         if SECOND_ROOT_TRACK_RE.match(s):
+            continue
+        if SECOND_ROOT_HEAD_RE.search(s):
+            continue
+        # "2024_1학기 기말 모범답안"처럼 시험 회차를 적어둔 묶음 폴더도 과목이 아니다
+        if re.search(r"\d{4}.*(중간|기말)", s):
             continue
         return re.sub(r"\s+", " ", s)
     return None
@@ -514,18 +566,45 @@ def fill_missing_categories(records):
                 return table[k]
             if k in detail_table:      # 세부과목 이름으로도 찾아본다(현대문학 등)
                 return detail_table[k]
-        # 마지막으로 부분 일치 (고급지구과학 ⊂ 고급지구과학1,2)
+        # 부분 일치 (고급지구과학 ⊂ 고급지구과학1,2)
         k = norm_subject(subject)
         for known, cat in table.items():
             if k and (k in known or known in k):
                 return cat
+        # 폴더 이름에 오타가 있는 경우("확룰과 통계" = 확률과 통계).
+        # 길이가 같고 한 글자만 다르면 같은 과목으로 본다.
+        for known, cat in table.items():
+            if len(known) == len(k) >= 3 and sum(a != b for a, b in zip(known, k)) == 1:
+                return cat
+        return None
+
+    # "지필고사" 폴더에는 없고 다른 폴더에만 있는 과목이라 대응표로는 못 찾는다.
+    # (객체지향프로그래밍은 정보 계열, 경제학은 사회 계열)
+    EXTRA_CATEGORY = {
+        "객체지향프로그래밍": "정보",
+        "경제학": "사회",
+    }
+
+    def category_from_path(r):
+        direct = EXTRA_CATEGORY.get(re.sub(r"\s+", "", r.get("subject") or ""))
+        if direct:
+            return direct
+        """대응표에 아예 없는 새 과목(객체지향프로그래밍 등)은 폴더 위치로 추정한다.
+        '창융특' 폴더 밑에 있으면 창의융합특강이다."""
+        for seg in r.get("folder_path") or []:
+            s = seg.strip()
+            if s in ("창융특", "창의융합특강") or s.startswith("창융특 "):
+                return "창의융합특강"
+        subj = r.get("subject") or ""
+        if subj.startswith("창융특") or subj.startswith("창의융합특강"):
+            return "창의융합특강"
         return None
 
     filled = unknown = 0
     for r in records:
         if r.get("category") or not r.get("subject"):
             continue
-        cat = lookup(r["subject"])
+        cat = lookup(r["subject"]) or category_from_path(r)
         if cat:
             r["category"] = cat
             filled += 1
@@ -543,6 +622,21 @@ def norm_subject(s):
                  ("IV", "4"), ("III", "3"), ("II", "2"), ("I", "1")):
         s = s.replace(a, b)
     return s
+
+
+# 사이트(index.html)가 실제로 쓰는 필드만 추린다. folder_path나 url 같은 건
+# 길이가 길고 화면에서 안 쓰는데, 파일이 1만 개가 넘어가니 그대로 다 실으면
+# data.js가 10MB를 넘어 첫 로딩이 눈에 띄게 느려진다.
+# (전체 필드는 data.json에 그대로 남아 있고 review.html이 그걸 쓴다)
+WEB_FIELDS = [
+    "id", "filename", "category", "subject", "subject_detail",
+    "year", "semester", "examtype", "doctype",
+    "parsed_ok", "folder_mismatch", "duplicate_sibling_folder", "size", "md5",
+]
+
+
+def slim_for_web(records):
+    return [{k: r.get(k) for k in WEB_FIELDS if r.get(k) is not None} for r in records]
 
 
 def canonicalize_subjects(records):
@@ -570,7 +664,7 @@ def canonicalize_subjects(records):
         r["subject"] = canonical.get(key, subj)
 
 
-def parse_record(filename, folder_path, drive_id):
+def parse_record(filename, folder_path, drive_id, layout="분류먼저"):
     fname_meta = parse_filename(filename)
     parsed_ok = fname_meta is not None
     if not parsed_ok:
@@ -580,16 +674,29 @@ def parse_record(filename, folder_path, drive_id):
         if isinstance(v, str):
             fname_meta[k] = v.strip()
 
-    # 두 최상위 폴더의 구조가 다르다.
-    #   지필고사      : 분류(국어/물리/…) / 과목 / N학기 X고사 / …   → 맨 앞이 분류
-    #   기말고사 기출 : N학기 기말고사 기출 / 기본선택 / 과목 / 문제지 → 분류가 없음
+    # 최상위 폴더마다 구조가 다르다.
+    #   지필고사 : 분류(국어/물리/…) / 과목 / N학기 X고사 / …  → 맨 앞이 분류
+    #   나머지   : 3학년 / 세계사 / 모범 답안 및 해설 / …      → 분류가 없음
     # 후자는 경로에 분류가 아예 없어서, 과목만 뽑아두고 분류는 나중에
     # (지필고사에서 얻은 과목→분류 대응표로) 채운다.
-    if folder_path and SECOND_ROOT_HEAD_RE.search(folder_path[0]):
+    # reprocess.py처럼 folder_path만 가지고 다시 계산할 때는 layout을 모르므로,
+    # 경로 맨 앞이 분류(국어/물리/…)가 아니라 학년·이수구분·시험회차면
+    # "분류없음" 구조로 본다.
+    if layout != "분류없음" and folder_path and not CATEGORY_NAME_RE.match(folder_path[0].strip()):
+        layout = "분류없음"
+
+    if layout == "분류없음":
         category = None
         subject = derive_subject_second_root(folder_path)
+        if not subject:
+            # 폴더에 과목이 없고 파일명에만 있는 경우
+            # ("2024_1학기 기말 모범답안 / 05_모범답안및해설_(문학)_2024년1기말.pdf")
+            subject = fname_meta.get("subject_raw")
     else:
         category = folder_path[0] if len(folder_path) > 0 else None
+        # "창융특"은 창의융합특강의 축약 표기라 분류 이름을 정식 명칭으로 통일한다
+        if category == "창융특":
+            category = "창의융합특강"
         subject = derive_subject(folder_path, category) if category else None
     folder_semester, folder_examtype = folder_semester_examtype(folder_path)
 
@@ -630,8 +737,12 @@ def parse_record(filename, folder_path, drive_id):
     # "2024_2기말_창융특XXVII_일반상대론_문제지.pdf"는 칸이 하나 더 많아서
     # doctype 자리에 과목명("일반상대론")이 들어간다. 파일명 안에 문서유형
     # 단어가 분명히 보이면 그걸 우선한다.
+    doctype = normalize_doctype(doctype)
     if not doctype or not any(w in doctype for w in ("문제", "답안", "해설", "정답")):
         kw = next((k for k in DOCTYPE_KEYWORDS if k in filename), None)
+        if not kw:
+            # "원안", "시험지"처럼 다르게 부른 이름도 파일명에서 찾아본다
+            kw = next((normalize_doctype(w) for w in DOCTYPE_SYNONYMS if w in filename), None)
         if kw:
             doctype = kw
 
@@ -727,7 +838,7 @@ def list_children(service, folder_id):
     return files
 
 
-def crawl(service, folder_id, folder_path):
+def crawl(service, folder_id, folder_path, layout="분류먼저"):
     records = []
     children = list_children(service, folder_id)
 
@@ -741,7 +852,7 @@ def crawl(service, folder_id, folder_path):
 
     for child in children:
         if child["mimeType"] == "application/vnd.google-apps.folder":
-            sub_records = crawl(service, child["id"], folder_path + [child["name"]])
+            sub_records = crawl(service, child["id"], folder_path + [child["name"]], layout)
             if child["name"] in duplicate_names:
                 for r in sub_records:
                     r["duplicate_sibling_folder"] = True
@@ -754,7 +865,7 @@ def crawl(service, folder_id, folder_path):
             if child["name"].startswith("._"):
                 # macOS 리소스 포크 잔여 파일(AppleDouble) - 실제 문서가 아님
                 continue
-            rec = parse_record(child["name"], folder_path, child["id"])
+            rec = parse_record(child["name"], folder_path, child["id"], layout)
             rec["duplicate_sibling_folder"] = False
             rec["duplicate_folder_id"] = None
             rec["duplicate_folder_modified"] = None
@@ -771,9 +882,9 @@ def main():
     service = get_service()
     print("크롤링 시작... (파일 수에 따라 몇 분 걸릴 수 있음)")
     records = []
-    for label, root_id in ROOT_FOLDERS:
+    for label, root_id, layout in ROOT_FOLDERS:
         print(f"  [{label}] 훑는 중...")
-        got = crawl(service, root_id, [])
+        got = crawl(service, root_id, [], layout)
         print(f"  [{label}] {len(got)}개")
         records.extend(got)
     filled, unknown = fill_missing_categories(records)
@@ -789,7 +900,7 @@ def main():
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         f.write(f'var EXAM_DATA_VERSION = "{stamp}";\n')
         f.write("var EXAM_DATA = ")
-        json.dump(records, f, ensure_ascii=False)
+        json.dump(slim_for_web(records), f, ensure_ascii=False, separators=(",", ":"))
         f.write(";\n")
 
     total = len(records)

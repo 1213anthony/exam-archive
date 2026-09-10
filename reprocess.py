@@ -45,7 +45,7 @@ with open("data.js", "w", encoding="utf-8") as f:
     # (브라우저가 data.js를 캐시해서 옛날 데이터를 보고 있는 경우를 구분하려고)
     f.write(f'var EXAM_DATA_VERSION = "{stamp}";\n')
     f.write("var EXAM_DATA = ")
-    json.dump(records, f, ensure_ascii=False)
+    json.dump(crawl.slim_for_web(records), f, ensure_ascii=False, separators=(",", ":"))
     f.write(";\n")
 
 subjects = {(r["category"], r["subject"]) for r in records}
