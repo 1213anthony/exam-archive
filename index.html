@@ -73,6 +73,29 @@
     margin: 16px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft);
   }
 
+  /* ---- 분류 섹션 (국어/수학/… 통째로 접기) ---- */
+  details.category { margin-top: 30px; }
+  details.category > summary {
+    cursor: pointer; list-style: none; user-select: none;
+    display: flex; align-items: baseline; gap: 9px;
+    padding: 9px 2px; border-bottom: 2px solid var(--ink);
+  }
+  details.category > summary::-webkit-details-marker { display: none; }
+  details.category > summary::before {
+    content: "▾"; color: var(--ink-mid); font-size: 12px; width: 12px; flex-shrink: 0;
+  }
+  details.category:not([open]) > summary::before { content: "▸"; }
+  details.category:not([open]) > summary { border-bottom-color: var(--line); }
+  details.category > summary:hover .cat-name { color: var(--accent); }
+  /* 분류가 과목보다 한 단계 위라는 게 보이도록 더 크고 진하게 */
+  .cat-name {
+    font-family: Georgia, "Nanum Myeongjo", ui-serif, serif;
+    font-size: 18px; font-weight: 600; color: var(--ink); letter-spacing: -.01em;
+  }
+  .cat-meta { font-size: 12px; color: var(--ink-soft); }
+  /* 분류 안의 과목은 한 칸 들여쓴다 */
+  details.category > details.subject { margin-left: 14px; }
+
   /* ---- 과목 섹션 ---- */
   details.subject { border-bottom: 1px solid var(--line-soft); }
   details.subject > summary {
@@ -276,6 +299,15 @@ function markReviewed(k, on) {
   else delete reviewed[k];
   saveMap(REVIEWED_KEY, reviewed);
 }
+// 어떤 분류를 접어뒀는지 이 브라우저에만 기억해둔다
+var CATFOLD_KEY = 'archive.catclosed';
+var catClosed = loadMap(CATFOLD_KEY);
+function isCatClosed(c) { return !!catClosed[c]; }
+function setCatClosed(c, closed) {
+  if (closed) catClosed[c] = 1; else delete catClosed[c];
+  saveMap(CATFOLD_KEY, catClosed);
+}
+
 function isHidden(r) { return !!hidden[r.id]; }
 function unhideAll() { hidden = {}; saveMap(HIDDEN_KEY, hidden); }
 
@@ -705,17 +737,30 @@ function render() {
   });
 
   catNames.forEach(function (cName) {
-    // 분류를 이미 탭으로 고른 상태면 분류 제목은 생략
-    if (!state.cat && catNames.length > 1) {
-      var h = document.createElement('div');
-      h.style.cssText = 'margin:24px 0 2px;font-size:13px;letter-spacing:.08em;color:var(--ink-soft);';
-      h.textContent = cName.toUpperCase();
-      out.appendChild(h);
-    }
-
     var subjects = Object.keys(byCat[cName]).sort(function (a, b) {
       return a.localeCompare(b, 'ko');
     });
+
+    // 분류를 탭으로 이미 하나만 고른 상태면 굳이 한 겹 더 감싸지 않는다
+    var catBox = out;
+    if (!state.cat && catNames.length > 1) {
+      var catDet = document.createElement('details');
+      catDet.className = 'category';
+      // 검색·필터 중에는 늘 펼쳐 보여주고, 그 밖에는 접어둔 기억을 따른다
+      catDet.open = !!(state.q || state.flagOnly) || !isCatClosed(cName);
+      var catExams = 0;
+      subjects.forEach(function (sn) { catExams += Object.keys(byCat[cName][sn]).length; });
+      var catSum = document.createElement('summary');
+      catSum.innerHTML = '<span class="cat-name"></span><span class="cat-meta">'
+        + subjects.length + '개 과목 · ' + catExams + '개 시험</span>';
+      catSum.querySelector('.cat-name').textContent = cName;
+      catDet.appendChild(catSum);
+      catDet.addEventListener('toggle', function () {
+        if (!state.q && !state.flagOnly) setCatClosed(cName, !catDet.open);
+      });
+      out.appendChild(catDet);
+      catBox = catDet;
+    }
 
     subjects.forEach(function (sName) {
       var exams = byCat[cName][sName];
@@ -890,7 +935,7 @@ function render() {
       });
 
       det.appendChild(body);
-      out.appendChild(det);
+      catBox.appendChild(det);
     });
   });
 
