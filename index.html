@@ -144,6 +144,13 @@
     background: transparent; color: var(--ink-soft);
   }
   .hidebtn:hover { border-color: var(--line); background: var(--line-soft); color: var(--ink); }
+  /* 같은 시험의 다른 스캔본을 펼쳐보는 버튼 */
+  .morebtn {
+    font: inherit; font-size: 11.5px; padding: 4px 7px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: var(--card); color: var(--ink-soft); white-space: nowrap;
+  }
+  .morebtn:hover { border-color: var(--accent); color: var(--accent); }
   .hiddennote {
     font-size: 12.5px; color: var(--ink-mid); background: var(--line-soft);
     border-radius: 4px; padding: 8px 12px; margin: 10px 0 0;
@@ -197,7 +204,7 @@
   <div class="searchbar">
     <input id="q" type="search" placeholder="과목, 연도, 파일명으로 검색…" autocomplete="off">
     <button id="favbtn" title="과목 이름 옆 별표로 즐겨찾기한 과목만 보기">즐겨찾기만</button>
-    <button id="flagbtn" title="드라이브에서 엉뚱한 폴더에 들어있거나(폴더 위치 다름), 파일명에 정보가 없어 연도·학기를 확정 못 한(미분류) 항목만 보기 - 화면에 보이는 값 자체는 대부분 정확함">정리 필요만</button>
+    <button id="flagbtn" title="파일명에 정보가 없어서 연도·학기를 확정하지 못한 항목만 보기">정리 필요만</button>
   </div>
   <div class="cats" id="cats"></div>
   <div class="statusline" id="status"></div>
@@ -277,10 +284,6 @@ function markReviewed(k, on) {
   saveMap(REVIEWED_KEY, reviewed);
 }
 function isHidden(r) { return !!hidden[r.id]; }
-function hideFile(r) {
-  hidden[r.id] = { filename: r.filename, at: new Date().toISOString().slice(0, 10) };
-  saveMap(HIDDEN_KEY, hidden);
-}
 function unhideAll() { hidden = {}; saveMap(HIDDEN_KEY, hidden); }
 
 // 파일 목록을 to_delete.txt로 저장한다. 이 페이지는 드라이브를 못 고치므로
@@ -680,55 +683,27 @@ function render() {
           .filter(Boolean).join(' ');
         if (tail) when.appendChild(document.createTextNode('  ' + tail));
 
-        if (group.some(function (r) { return r.folder_mismatch; })) {
-          var f1 = document.createElement('span');
-          // 데이터가 틀렸다는 게 아니라 "드라이브에서 엉뚱한 이름의 폴더에
-          // 들어있다"는 뜻이라 경고색 대신 흐리게 표시한다. 실제로 PDF 표지까지
-          // 대조해본 결과 대부분(92/115) 여기 보이는 값이 맞고 폴더 이름만 틀렸음.
-          f1.className = 'flag muted'; f1.textContent = '폴더 위치 다름';
-          f1.title = '여기 보이는 연도·학기·시험종류는 시험지 표지 기준으로 맞음. '
-            + '다만 드라이브에서는 이름이 다른 폴더(예: "1학기 중간고사")에 들어가 있어서 '
-            + '드라이브 정리가 필요하다는 표시임';
-          when.appendChild(f1);
-        }
-        if (dupHidden > 0) {
-          var f2 = document.createElement('span');
-          f2.className = 'flag dup'; f2.textContent = '중복 ' + dupHidden + '개 숨김';
-          f2.title = '드라이브에 같은 파일이 두 벌 올라와 있어서(같은 이름의 폴더가 2개) 하나만 표시함. 내용 해시로 확인한 결과 완전히 동일한 파일임';
-          when.appendChild(f2);
-        } else if (group.some(function (r) { return r.duplicate_sibling_folder; })) {
+        // "폴더 위치 다름"은 드라이브에서 파일이 엉뚱한 이름의 폴더에 들어있다는
+        // 뜻일 뿐이고, 화면에 보이는 연도·학기·시험종류는 PDF 표지 기준으로 맞다.
+        // 여기서 고칠 것도 없는 표시가 78줄에 붙어 있어서 뺐다.
+        // 같은 파일이 여러 벌 있는 건 이제 흔한 일이고 자동으로 합쳐지므로
+        // 따로 표시하지 않는다(1500줄 넘게 배지가 붙어 오히려 지저분했다).
+        if (dupHidden === 0 && group.some(function (r) { return r.duplicate_sibling_folder; })) {
           var f2b = document.createElement('span');
-          f2b.className = 'flag'; f2b.textContent = '동명 폴더';
+          f2b.className = 'flag muted'; f2b.textContent = '동명 폴더';
           f2b.title = '같은 이름의 형제 폴더가 2개 있는데, 이 시험 파일들은 서로 내용이 달라서 합치지 않았음';
           when.appendChild(f2b);
-        }
-        if (group.some(function (r) { return !r.parsed_ok; })) {
-          var f3 = document.createElement('span');
-          f3.className = 'flag'; f3.textContent = '미분류';
-          when.appendChild(f3);
-        }
-
-        // 뭔가 표시가 붙은 줄이면 "확인함" 버튼을 준다 - 눌러두면 "정리 필요만"
-        // 목록에서 빠진다(데이터를 고치는 게 아니라 내가 확인했다는 표시)
-        if (group.some(isFlagged) || isReviewed(k)) {
-          var rv = document.createElement('button');
-          var done = isReviewed(k);
-          rv.className = 'reviewbtn' + (done ? ' on' : '');
-          rv.textContent = done ? '확인함 ✓' : '확인함';
-          rv.title = done
-            ? '다시 누르면 "정리 필요" 목록에 도로 넣습니다'
-            : '이 시험은 확인이 끝났다고 표시합니다 - "정리 필요만" 목록에서 빠집니다';
-          rv.addEventListener('click', function () {
-            markReviewed(k, !isReviewed(k));
-            render();
-          });
-          when.appendChild(rv);
         }
         label.appendChild(when);
 
         var fn = document.createElement('div');
         fn.className = 'exam-files';
-        fn.textContent = group.map(function (r) { return r.filename; }).join('   ·   ');
+        var names = group.map(function (r) { return r.filename; });
+        // 파일명이 4개씩 늘어서면 회색 글씨만 세 줄이 된다. 두 개까지만 보여주고
+        // 전체는 마우스를 올렸을 때 뜨게 한다.
+        fn.textContent = names.slice(0, 2).join('   ·   ')
+          + (names.length > 2 ? '   ·   외 ' + (names.length - 2) + '개' : '');
+        if (names.length > 2) fn.title = names.join('\n');
         label.appendChild(fn);
 
         // 문제/해설로 분류 안 되는 파일은 따로 링크로
@@ -758,30 +733,48 @@ function render() {
             container.appendChild(none);
             return;
           }
-          list.forEach(function (r, i) {
+          // 같은 시험의 같은 문서유형이 여러 개 남는 경우가 있다(같은 해설인데
+          // 스캔본이 달라 내용 해시가 다른 것). 한 줄에 "해설 1 / 해설 2"가
+          // 늘어서면 지저분하므로 하나만 보여주고 나머지는 접어둔다.
+          var primary = list[0], alternates = list.slice(1);
+          [primary].forEach(function (r) {
             var wrap = document.createElement('span');
             wrap.className = 'btn-wrap';
             wrap.appendChild(makeCheckbox(r));
             var a = document.createElement('a');
             a.className = 'btn ' + cls;
             a.href = viewUrl(r); a.target = '_blank'; a.rel = 'noopener';
-            a.textContent = list.length > 1 ? text + ' ' + (i + 1) : text;
+            a.textContent = text;
             wrap.appendChild(a);
-            // 문제1/문제2처럼 같은 게 두 개 뜰 때, 실제로 같은 파일이면 하나를 숨긴다
-            if (list.length > 1) {
-              var x = document.createElement('button');
-              x.className = 'hidebtn';
-              x.textContent = '×';
-              x.title = '이건 위 파일과 같은 자료라서 숨기기 (드라이브 파일은 그대로 있음)';
-              x.addEventListener('click', function (e) {
-                e.preventDefault(); e.stopPropagation();
-                hideFile(r);
-                render();
-              });
-              wrap.appendChild(x);
-            }
             container.appendChild(wrap);
           });
+
+          if (alternates.length) {
+            var more = document.createElement('button');
+            more.className = 'morebtn';
+            more.textContent = '+' + alternates.length;
+            more.title = '같은 시험의 다른 ' + text + ' 파일 ' + alternates.length + '개 (스캔본이 다름)';
+            var shown = false;
+            var box = document.createElement('span');
+            box.className = 'btn-wrap';
+            box.hidden = true;
+            alternates.forEach(function (r, i) {
+              box.appendChild(makeCheckbox(r));
+              var a2 = document.createElement('a');
+              a2.className = 'btn ' + cls;
+              a2.href = viewUrl(r); a2.target = '_blank'; a2.rel = 'noopener';
+              a2.textContent = text + ' ' + (i + 2);
+              box.appendChild(a2);
+            });
+            more.addEventListener('click', function (e) {
+              e.preventDefault();
+              shown = !shown;
+              box.hidden = !shown;
+              more.textContent = shown ? '−' : '+' + alternates.length;
+            });
+            container.appendChild(more);
+            container.appendChild(box);
+          }
         }
 
         var clusters = clusterGroup(group);
