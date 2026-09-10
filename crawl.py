@@ -117,6 +117,19 @@ PATTERN_N = re.compile(
     r"^(?P<year>\d{4})학년도(?P<semester>\d)학기(?P<examtype>중간|기말)고사"
     r"(?P<doctype>[^\(]+)\((?P<subject_raw>[^)]+)\)(?P<suffix>.*)\.pdf$"
 )
+# P) "2012서울과학1학기중간고사(중국어).pdf" / "...중간고사모범답안(중국어).pdf"
+#    N)과 같은 통짜형인데 "학년도"가 없고 학교 이름이 끼어있는 경우. 문서유형이
+#    비어 있으면(=시험지 자체) 문제지로 본다.
+PATTERN_P = re.compile(
+    r"^(?P<year>(?:19|20)\d{2})[^\d]*?(?P<semester>\d)학기(?P<examtype>중간|기말)고사"
+    r"(?P<doctype>[^()\d]*)\((?P<subject_raw>[^)]+)\)(?P<suffix>.*)\.pdf$"
+)
+# Q) "04_모범답안및해설_(미적분학2)_2019_2학기_기말.pdf" (연도와 학기 사이가 "_")
+PATTERN_Q = re.compile(
+    r"^(?P<seq>\d+)_(?P<doctype>[^_]+)_\(?(?P<subject_raw>" + _NESTED_PARENS + r")\)?_"
+    r"(?P<year>(?:19|20)\d{2})_(?P<semester>\d)\s*학기[_\s]*(?P<examtype>중간|기말)"
+    r"(?:고사)?(?P<suffix>.*)\.pdf$"
+)
 # O) "11-1한국사기말고사문제.pdf" (두 자리 연도-학기 축약형, 20xx로 간주)
 PATTERN_O = re.compile(
     r"^(?P<yy>\d{2})-(?P<semester>\d)(?P<subject_raw>[^0-9]+?)(?P<examtype>중간|기말)고사(?P<doctype>.+)\.pdf$"
@@ -124,8 +137,15 @@ PATTERN_O = re.compile(
 # F) 2011~2014년 옛날 파일: "역학1모범답안201101중간.pdf" (과목+문서유형+연도+월(01/02로
 #    학기를 나타냄)+중간/기말, 구분자 없음)
 PATTERN_F = re.compile(
-    r"^(?P<subject_raw>.+?)(?P<doctype>모범답안및해설|모범답안|모법답안|문제지|시험지)"
+    r"^(?P<subject_raw>.+?)(?P<doctype>모범답안및해설|모범답안\(해설\)|모범답안|모법답안"
+    r"|정답및해설|정답\(해설\)|정답지|정답|해설|문제지|시험지)"
     r"(?P<year>\d{4})(?P<sem2>0[12])(?P<examtype>중간|기말)(?P<suffix>.*)\.pdf$"
+)
+# F2) F와 같은 모양인데 문서유형 단어가 아예 없는 것: "컴퓨터과학201101중간.pdf".
+#     문서유형은 못 정하지만 과목/연도/학기는 확실히 건질 수 있다.
+PATTERN_F2 = re.compile(
+    r"^(?P<subject_raw>[^\d_]+?)(?P<year>(?:19|20)\d{2})(?P<sem2>0[12])"
+    r"(?P<examtype>중간|기말)(?P<suffix>.*)\.pdf$"
 )
 # G) "2011년2학기기말문제지_현대문학.pdf" (연도+학기+시험종류+문서유형이 통짜, 과목만 분리)
 PATTERN_G = re.compile(
@@ -152,10 +172,14 @@ PATTERNS = [
     PATTERN_A, PATTERN_B, PATTERN_C, PATTERN_D, PATTERN_E,
     PATTERN_I, PATTERN_L, PATTERN_M, PATTERN_N, PATTERN_O,
     PATTERN_F, PATTERN_G, PATTERN_H, PATTERN_J, PATTERN_K,
+    # 아래는 나중에 추가한 예외형. 위 패턴들이 먼저 잡아가는 걸 막지 않도록 끝에 둔다.
+    PATTERN_Q, PATTERN_P, PATTERN_F2,
 ]
 
 FOLDER_EXAM_RE = re.compile(r"(?P<semester>\d)학기\s*(?P<examtype>중간|기말)고사")
-YEAR_ANYWHERE_RE = re.compile(r"(\d{4})년")
+# "20141년중간"처럼 오타로 숫자가 하나 더 붙은 파일이 있는데, 가드가 없으면
+# 뒤에서부터 맞춰서 연도를 "0141"로 읽어버린다. 19xx/20xx로 제한한다.
+YEAR_ANYWHERE_RE = re.compile(r"((?:19|20)\d{2})년")
 # "년" 바로 뒤가 아니어도(예: "2011학년도...", 구분자 없이 붙어쓴 옛날 파일) 최소한
 # 연도 후보는 건지도록 하는 2차 fallback. 19xx/20xx 범위로 오탐 위험을 줄인다.
 BARE_YEAR_RE = re.compile(r"((?:19|20)\d{2})")
@@ -163,7 +187,13 @@ BARE_YEAR_RE = re.compile(r"((?:19|20)\d{2})")
 # 보이는 경우가 있음 - 이럴 땐 폴더명보다 이 값을 믿는 게 낫다(폴더명이 실제로 자주
 # 틀리다는 걸 확인했기 때문). 예: 파일명엔 분명히 "중간"이라고 쓰여 있는데 폴더는
 # "기말고사"인 경우, 폴더 대신 파일명 쪽을 신뢰해야 함.
-SEM_EXAMTYPE_ANYWHERE_RE = re.compile(r"(?<!\d)(?P<semester>\d)\s*학?기?\s*(?P<examtype>중간|기말)")
+# 학기 숫자는 구분자 뒤("2011_1중간", "2019년2중간")나 "N학기" 꼴로만 인정한다.
+# 그냥 앞 글자에 붙어 있으면 과목 이름의 끝 숫자일 때가 많다
+# ("미적분학2중간고사.pdf"의 2는 학기가 아니라 과목 번호).
+SEM_EXAMTYPE_ANYWHERE_RE = re.compile(
+    r"(?:(?<=^)|(?<=[\s_\-년\)\]]))(?P<semester>\d)(?:\s*학기\s*|\s*)(?P<examtype>중간|기말)"
+    r"|(?P<semester2>\d)\s*학기\s*(?P<examtype2>중간|기말)"
+)
 EXAMTYPE_ANYWHERE_RE = re.compile(r"(중간|기말)")
 DOCTYPE_KEYWORDS = [
     "모범답안및해설", "모범답안", "해설", "정답지", "답안지", "문제지",
@@ -417,6 +447,104 @@ MANUAL_OVERRIDES = {
     "13Vj_3qYFz4UkxlwkAdpFgq9fpeSR-ShQ": {"year": "2013", "semester": "1", "examtype": "기말고사", "doctype": "문제지"},
 }
 
+# 위 MANUAL_OVERRIDES에 이미 같은 파일이 다른 이유로 들어가 있는 경우가 있다
+# (예: 시험종류만 고쳐둔 파일의 과목까지 나중에 바로잡게 된 경우).
+# 같은 사전에 키를 두 번 쓰면 앞의 것이 조용히 사라지므로, 나중에 확인한 것은
+# 여기에 따로 모아두고 아래에서 "덮어쓰기"가 아니라 "합치기"로 반영한다.
+VERIFIED_FIXES = {
+    # ---- PDF 표지를 직접 열어서 확정한 것들 (파일명·폴더가 실제와 달랐음) ----
+    # 표지: 2015학년도 2학기 기말고사 (중국어 Ⅱ) - 파일명엔 번호가 없었음
+    "1SNj1Y6XEJlS1YHihLq2GJhOSi5ErKLZE": {"subject": "중국어2"},
+    "1x8uHunu7-rMHySxdrd5iu-foZaSI5X7P": {"subject": "중국어2"},
+    # 표지: 2014학년도 2학기 기말고사 중국어Ⅱ - 파일명은 "2014_ᄀ중간"으로 깨져 있음
+    "1m1Rv6QzQFSZF5IkoeRBEJd7WzcdnthPz": {"subject": "중국어2", "year": "2014", "semester": "2", "examtype": "기말고사"},
+    "16IZEAEJS20Flizok13kkTxb2Ib0bSYi7": {"subject": "중국어2", "year": "2014", "semester": "2", "examtype": "기말고사"},
+    # 표지: 2021학년도 2학기 기말고사 (중국어Ⅱ) - 파일명은 "(2)2_ᄂ중간"으로 깨져 있음
+    "1qQxffe0_AFnVBIsuK8OKEXWIR-VLrc7d": {"subject": "중국어2", "year": "2021", "semester": "2", "examtype": "기말고사"},
+    "1vdmtxspBkHTcPJ3bBsdmeS0Yf0khO081": {"subject": "중국어2", "year": "2021", "semester": "2", "examtype": "기말고사"},
+    # 표지: 2016학년도 1학기 기말고사 (중국어 Ⅰ)
+    "1M6HT-myQ_9kWoYaML2ynkKExklPQHUtZ": {"subject": "중국어1"},
+    # 표지: 2022학년도 1학기 중간고사 (독서Ⅲ)과 모범답안 - 폴더는 독서1이었음
+    "1X06sJ93c0L2nrpjbvr1okZ9JumPSZohq": {"subject": "독서3"},
+    "1ToSXJyFp2txACQBBuvR9gfFdfGk9G7_d": {"subject": "독서3"},
+    "1PkQKcNESQTwRLijRrbj0PYb7bfmaLufu": {"subject": "독서3"},
+    "1aacWTxtMWtEGZKRcrd1-HbKnQDOdw8q7": {"subject": "독서3"},
+    # 표지: (현대문학)과 정답 및 해설 - 파일명엔 그냥 "문학"이라고만 돼 있어서
+    # 같은 시험의 현대문학 문제지와 짝이 안 맞고 있었다
+    "1LFy5Qq2yT_yOdOB26OE21bTQwdUFAD0Z": {"subject_detail": "현대문학"},
+    "1kmQqp_MRvVPSt1XrDyjPlT_v9dzDQsrv": {"subject_detail": "현대문학"},
+    "1joSdecEGCO4BPacZg9SAWOWWgYNYGFrx": {"subject_detail": "현대문학"},
+    "18KryKVB508hseuEe8hkAO5hPf5VfDe-R": {"subject_detail": "현대문학"},
+
+    # ---- 엉뚱한 과목 폴더에 들어가 있던 파일들 ----
+    # 파일명에 적힌 과목과 폴더가 완전히 다르고, 파일명 쪽 과목의 같은 시험에는
+    # 이미 같은 파일이 있는 걸(내용 해시로) 확인했다. 폴더가 틀린 것.
+    # 이 파일은 창의융합특강 폴더 밑에 있어서 분류까지 같이 바로잡아야 한다
+    "1YYQhwq1uHlZTSJgo8hSBFLE-EFT1XJuV": {"subject": "국어2", "category": "국어"},
+    "1tac6M6OnVJ2YDxV7ZMxmjKFWAKjEFxEN": {"subject": "국어2"},
+    "1kxvijphLSc6E3jjASePsZsp-zU1mPDQb": {"subject": "컴퓨터과학2"},  # 지구과학III 폴더에 있던 컴퓨터과학II 해설
+    "191TXHW-pq7DROagPSXRH_597IBqGuQSB": {"subject": "생명과학3"},    # 물리학3 폴더에 있던 생명과학3 해설
+    "1SuxSRyo1TjPmOEMdmkpSTBF6ubrv8emT": {"subject": "생명과학3"},
+    "1dWixt3iVirhlYZ66JBcfyO5Gog9ShFky": {"subject": "영어회화1"},    # English Conversation I = 영어회화1
+    "1u9mZtTfLefXohSx125Kg8UOYH41ADrC9": {"subject": "영어회화1"},    # 같은 파일(확장자만 없음)
+    # "1학년 / 국어" 폴더의 2023년 1중간 문제지. 같은 시험의 해설이 국어1에
+    # 있고 파일명 형식도 짝이 맞는다(01_문제지_(국어) / 05_모범답안및해설_(국어1)).
+    "1dZ9-hXDBCOAhRs3NhYMvWL9gHI3Hzeyn": {"subject": "국어1"},
+    "1ZWGBn2J8f6x0lTxdEPOrCrxEunTFUifn": {"subject": "국어1"},
+    # 표지: 2013학년도 1학기 중간고사 (물리학1)
+    "1ZQ0T69WENYPdCh4z0qQ2TB1xGv3NugZn": {"year": "2013", "semester": "1", "examtype": "중간고사"},
+    "1McLcBFv-wuUqOo4kuhoB4_4XyZJLKUc8": {"year": "2013", "semester": "1", "examtype": "중간고사"},
+    "18K50KdmnV_iYeQeK2VWe5bSzZGw4SEKU": {"year": "2013", "semester": "1", "examtype": "중간고사"},
+    "1a7w_6e7xLLQLDowokbL83wlfP5mXCgNR": {"year": "2013", "semester": "1", "examtype": "중간고사"},
+    # 표지: 2012학년도 2학기 기말고사 (물 리 화 학) - 파일명의 '2중간'이 틀림
+    "1akZS7LrFGb32BvoC7HO7K2f59sfyro7R": {"semester": "2", "examtype": "기말고사"},
+    "1v6909jA8SijlTnl5vKd01EPFndlytbh_": {"semester": "2", "examtype": "기말고사"},
+    # 내용이 답안표(번호/답/배점)이고 같은 폴더의 2011 1기말 세포생물학I 시험 것
+    "1OTShGgCfWvTyQ_1iuocd2bRSXzpOOGGx": {"examtype": "기말고사", "doctype": "모범답안및해설"},
+    "12Oy-3dfPoh6fcamiR3y-VzHpu_aRM1QD": {"examtype": "기말고사", "doctype": "모범답안및해설"},
+    # 표지: 2013학년도 2학기 기말고사 (미적분학II), 2013년 12월 2일
+    "11DwNgZOjuEcVZcmpb5QUnfh4JW6LrM6c": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1mVgB_dRt9Vb19ibFUvLcj_rSmzYcyZae": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    # 표지: 2012학년도 1학기 중간고사 (미적분학II)
+    "1KZbO8O82hva4JhIYOEGZduZbiFsLgp1n": {"year": "2012", "semester": "1", "examtype": "중간고사", "doctype": "문제지"},
+    "1TRWNTVisL2L27T_TU3Qxfe4m1HwYcn6R": {"year": "2012", "semester": "1", "examtype": "중간고사"},
+    "1wdnVUWE6ejBPdKcdszrRFjfNkfLWPv-d": {"year": "2012", "semester": "1", "examtype": "중간고사"},
+    # 표지: 2013학년도 2학기 중간고사 (미적분학II)
+    "1-E_k4yEQMaARzUTd_IAnhR3OFegGobPQ": {"year": "2013", "semester": "2", "examtype": "중간고사"},
+    "1EeBBP-S6LB11a0ziZJP3VwAimzARuI4X": {"year": "2013", "semester": "2", "examtype": "중간고사"},
+    "1VS6WbMLKl-Gc48qmkpSlbfFMI8MSQmUM": {"year": "2013", "semester": "2", "examtype": "중간고사"},
+    # 표지: 2014학년도 1학기 기말고사 (미적분학II)
+    "12iMd2QRct7-3k1QQ02NbVXHgl0tr2WDO": {"year": "2014", "semester": "1", "examtype": "기말고사"},
+    # 표지: 2016학년도 1학기 기말고사 (영어Ⅰ) - 파일명의 '2'는 학기가 아님
+    "1VmYixyz53MjTARE3QcD1I6ncOv5bdOB7": {"year": "2016", "semester": "1", "examtype": "기말고사"},
+    # 표지: 2016학년도 1학기 중간고사 (영 작 문)
+    "1uhLP6pSNzVEVgUMghv_A7U0twMP-7lKg": {"year": "2016", "semester": "1", "examtype": "중간고사"},
+    # 표지: 2016학년도 1학기 기말고사 (중국어 Ⅰ)
+    "1NoCc-hJ_DZrNXkN6aeTt34a125xQOUcf": {"year": "2016", "semester": "1", "examtype": "기말고사"},
+    # 표지: 2015학년도 1학기 기말고사 (고급생명과학 II)
+    "131RtAy8lT_Ve3o6JqQW1w6JUzIEZQlJt": {"year": "2015", "semester": "1", "examtype": "기말고사"},
+    "1-Lqs9ND-0P9-X8zX8by1Vsaau2NMPzpX": {"year": "2015", "semester": "1", "examtype": "기말고사"},
+    # 표지: (일반생물학II)과 정답 및 해설 - 폴더는 생명과학1이었음
+    "1kI3BamJRDrYGW4_DhqGW31RSy4oS1EyX": {"subject": "생명과학2"},
+    "1rKvhXvV6UhLI59MGZiCk8TLt3aDuawP2": {"subject": "생명과학2"},
+    # 위와 같은 시험의 다른 판본
+    "1Pp90H1ZSI3s98oCHImpQoUJ2bqNcwByC": {"subject": "생명과학2"},
+    # 표지 머리글엔 '1학기 중간'이라고 돼 있지만 시행일이 9월 25일(2학기)이고,
+    # 똑같은 파일명이 이미 2015년 2학기 중간 시험에 짝을 이뤄 들어가 있다.
+    # 표지 머리글 쪽이 선생님 오타로 보여 학기를 2로 잡는다.
+    "1mXR3EKNmXsPNpcv0GOn1z2i2be1zr272": {"year": "2015", "semester": "2", "examtype": "중간고사"},
+    "1gr70mMsf5eeSUVnjFdmiNW-F54fCuhJH": {"year": "2015", "semester": "2", "examtype": "중간고사"},
+    "1B2qvfy6SSsBSursjTIXxi_pcq30o3SVA": {"year": "2015", "semester": "2", "examtype": "중간고사"},
+    # 표지: 2022학년도 1학기 기말고사 (커뮤니케이션), 2022년 7월 4일 - 세 파일 다
+    # 이름엔 "2기말"이라 돼 있지만 실제로는 1학기 기말이다(같은 시험의 문제지도 1기말에 있음)
+    "1t_y36G1g16I1gwD3svZJue7AiBd_KMMc": {"year": "2022", "semester": "1", "examtype": "기말고사"},
+    "1XBfzJRvJ_Pms2KkrfMpm_zzM4UIBcpzW": {"year": "2022", "semester": "1", "examtype": "기말고사"},
+    "1Llj9z_k2fny22NWUeEp5S72ToRJ_Q7Vm": {"year": "2022", "semester": "1", "examtype": "기말고사"},
+}
+
+for _fid, _fix in VERIFIED_FIXES.items():
+    MANUAL_OVERRIDES.setdefault(_fid, {}).update(_fix)
+
 
 def parse_filename(filename):
     # 확장자가 빠진 파일이 꽤 많다(예: "2024_1기말_과학사_문제지"). 아래 패턴들이
@@ -431,8 +559,35 @@ def parse_filename(filename):
                 groups["year"] = str(2000 + int(groups["yy"]))
             if "sem2" in groups and groups.get("sem2"):
                 groups["semester"] = str(int(groups["sem2"]))
+            # 정규식이 "맞긴 맞았는데" 값이 말이 안 되는 경우가 있다. 그냥 두면
+            # parsed_ok=True로 확정돼버려서 fallback도 안 타고 틀린 값이 남는다.
+            if not _plausible(groups):
+                continue
+            # "2011-1학기기말-영어1.pdf"(J), "2012...중간고사(중국어).pdf"(P)처럼
+            # 문서유형 칸이 비어 있는 형식은 시험지 본체를 뜻한다. 같은 시험의
+            # 해설은 늘 "-모범답안"이 붙은 별도 파일로 존재하는 걸 확인했다.
+            if pat in (PATTERN_J, PATTERN_P) and not (groups.get("doctype") or "").strip():
+                groups["doctype"] = "문제지"
             return groups
     return None
+
+
+# 파싱 결과가 상식적인지 확인한다.
+#  - 연도: "20141년중간" 같은 오타 파일에서 뒤로 밀려 "0141"이 잡히는 걸 막는다.
+#  - 과목: "2011_1중간_기말_세포.pdf"는 칸이 하나 더 많아서 과목 자리에 "기말"이
+#    들어간다. 이런 건 과목이 아니라 파싱 실패로 취급해야 한다.
+_BAD_SUBJECT_WORDS = {"중간", "기말", "중간고사", "기말고사", "문제", "문제지",
+                      "답안", "해설", "모범답안", "모범답안및해설", "정답"}
+
+
+def _plausible(groups):
+    year = groups.get("year")
+    if year and not (year.isdigit() and 1990 <= int(year) <= 2100):
+        return False
+    subj = (groups.get("subject_raw") or "").strip()
+    if subj and subj in _BAD_SUBJECT_WORDS:
+        return False
+    return True
 
 
 def fallback_parse(filename):
@@ -440,7 +595,8 @@ def fallback_parse(filename):
     doctype = next((kw for kw in DOCTYPE_KEYWORDS if kw in filename), None)
     sem_ex_m = SEM_EXAMTYPE_ANYWHERE_RE.search(filename)
     if sem_ex_m:
-        semester, examtype = sem_ex_m.group("semester"), sem_ex_m.group("examtype")
+        semester = sem_ex_m.group("semester") or sem_ex_m.group("semester2")
+        examtype = sem_ex_m.group("examtype") or sem_ex_m.group("examtype2")
     else:
         semester = None
         ex_m = EXAMTYPE_ANYWHERE_RE.search(filename)
@@ -528,6 +684,9 @@ SUBJECT_ALIASES = {
     "로봇공학기초실습2": "로봇공학실습2",
     "고급지구과학1,2": "고급지구과학",  # 두 과목을 한 폴더에 묶어둔 이름
     "양자정보특강": "양자정보특강1",     # 파일은 모두 양자정보특강1
+    # 영어 표기로 적힌 파일이 섞여 있다 ("English Conversation I" = 영어회화1)
+    "EnglishConversation1": "영어회화1",
+    "EnglishConversation2": "영어회화2",
 }
 
 # 폴더 이름 끝에 시험 종류가 붙어버린 경우 ("국어1-중간" -> "국어1")
@@ -546,6 +705,9 @@ def apply_subject_alias(subject):
     #   "(심리학)(최종)" -> 괄호와 꼬리표를 뗀다
     subject = re.sub(r"^(창의융합특강|창융특)\s*[0-9IVXⅠ-Ⅻ]*\s*[_\-\s]*", "", subject).strip()
     subject = re.sub(r"\((최종|수정|재시험)\)", "", subject).strip()
+    # "생명과학3(2학년)"은 과목이 아니라 학년까지 적어둔 폴더 이름이다. 학년은
+    # 파일명(subject_detail)에 남아 화면에서 따로 묶이므로 과목명에서는 뗀다.
+    subject = re.sub(r"\s*\([1-3]\s*학년\)\s*$", "", subject).strip()
     if subject.startswith("(") and subject.endswith(")"):
         subject = subject[1:-1].strip()
     if not subject:
@@ -703,6 +865,50 @@ WEB_FIELDS = [
 ]
 
 
+# ---- 같은 과목 안에서 빈 칸 채우기 ------------------------------------------
+# 문제지와 해설이 같은 시험인데도 파일명 표기가 서로 달라서 한쪽만 학기(또는 연도,
+# 시험종류)를 못 읽는 경우가 많다. 예)
+#   01_문제지_(중국어)_2015년 중간고사.pdf        -> 2015 / ?  / 중간고사
+#   04_모범답안및해설(중국어)_2015년1중간고사.pdf -> 2015 / 1학기 / 중간고사
+# 이러면 시험 키가 갈라져서 양쪽 다 "해설 없음 / 문제 없음"으로 뜬다.
+# 그래서 값을 아는 형제 파일이 **딱 하나로 특정될 때만** 빈 칸을 옮겨 적는다.
+# (후보가 둘 이상이면 어느 시험인지 알 수 없으므로 손대지 않는다.)
+_EXAM_FIELDS = ("year", "semester", "examtype")
+
+
+def fill_missing_exam_fields(records):
+    by_subject = {}
+    for r in records:
+        by_subject.setdefault((r.get("category"), r.get("subject")), []).append(r)
+
+    filled = 0
+    for group in by_subject.values():
+        # 세 값이 모두 있는 시험들만 "채워 넣을 정답 후보"로 삼는다
+        complete = {
+            tuple(r[f] for f in _EXAM_FIELDS)
+            for r in group
+            if all(r.get(f) for f in _EXAM_FIELDS)
+        }
+        if not complete:
+            continue
+        for r in group:
+            known = {f: r.get(f) for f in _EXAM_FIELDS if r.get(f)}
+            if len(known) == len(_EXAM_FIELDS) or not known:
+                continue  # 이미 다 알거나, 아는 게 하나도 없어 단서가 없음
+            cands = [
+                key for key in complete
+                if all(key[_EXAM_FIELDS.index(f)] == v for f, v in known.items())
+            ]
+            if len(cands) != 1:
+                continue
+            for i, f in enumerate(_EXAM_FIELDS):
+                if not r.get(f):
+                    r[f] = cands[0][i]
+            r["filled_from_sibling"] = True
+            filled += 1
+    return filled
+
+
 def slim_for_web(records):
     return [{k: r.get(k) for k in WEB_FIELDS if r.get(k) is not None} for r in records]
 
@@ -758,7 +964,39 @@ def split_numbered_variants(records):
         # 폴더에 번호가 없더라도(고급지구과학) 안에 1과 2가 같이 있으면 나눈다
         if len(nums_in_folder[(r.get("category"), base_s)] | {num_s} - {""}) < 2:
             continue
-        r["subject"] = detail
+        # 파일명 표기 그대로 쓰면 "중국어II" 같은 로마숫자 이름이 별도 과목으로
+        # 남아버린다(같은 과목인 "중국어2"와 갈라져서 문제/해설이 따로 뜸).
+        r["subject"] = apply_subject_alias(detail) or detail
+        moved += 1
+    return moved
+
+
+# "문학" 폴더는 사실상 고전문학/현대문학/현대문학2/현대문학3를 한꺼번에 담아둔
+# 통이다(278개 중 243개가 그렇다). 다른 최상위 폴더에는 같은 파일이 "고전문학",
+# "현대문학"이라는 제 이름의 폴더로도 들어있어서, 그냥 두면 똑같은 시험이
+# "문학" 줄과 "현대문학" 줄로 두 번 나오고 양쪽 다 "문제 없음"이 뜬다.
+# 그래서 파일명에 과목이 분명히 적혀 있으면 그 이름 쪽으로 옮긴다.
+# (전체 과목을 훑어본 결과 이런 "통 폴더"는 문학뿐이라 여기만 처리한다.)
+CONTAINER_SUBJECTS = {"문학"}
+
+
+def split_container_subjects(records):
+    known = set()
+    for r in records:
+        if r.get("subject"):
+            known.add((r.get("category"), norm_subject(r["subject"])))
+
+    moved = 0
+    for r in records:
+        subject, detail = r.get("subject"), r.get("subject_detail")
+        if subject not in CONTAINER_SUBJECTS or not detail:
+            continue
+        cand = apply_subject_alias(detail)
+        if not cand or norm_subject(cand) == norm_subject(subject):
+            continue
+        if (r.get("category"), norm_subject(cand)) not in known:
+            continue
+        r["subject"] = cand
         moved += 1
     return moved
 
@@ -1030,6 +1268,12 @@ def main():
     if moved:
         print(f"  폴더와 파일명의 과목 번호가 다른 {moved}개는 파일명 쪽으로 옮김")
     canonicalize_subjects(records)
+    cont = split_container_subjects(records)
+    if cont:
+        print(f"  '문학'처럼 여러 과목을 담고 있던 폴더에서 {cont}개를 제 과목으로 옮김")
+    sib = fill_missing_exam_fields(records)
+    if sib:
+        print(f"  같은 과목의 형제 파일에서 빈 칸을 채운 기록 {sib}개")
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(records, f, ensure_ascii=False, indent=2)
     # index.html은 CORS 문제 없이 그냥 더블클릭으로도 열리도록 JSON을 JS 변수로도 저장

@@ -375,17 +375,25 @@ function matchesQuery(r, q) {
 function normDetail(s) {
   if (!s) return null;
   s = s.replace(/\s+/g, '');
+  // 파일명이 잘려 들어와 문서유형이 앞에 붙는 경우: "문제지(고급물리학1)"
+  s = s.replace(/^(모범답안및해설|모범답안|정답및해설|문제지|해설|정답|답안|문제)[_(\-]*/, '');
+  // 학년(2학년/3학년)은 실제로 다른 시험이라 따로 떼어 보관하고 이름에서는 뺀다
+  s = s.replace(/[1-3]\s*학년/g, '');
   s = s.replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III').replace(/Ⅳ/g, 'IV')
        .replace(/ⅰ/g, 'I').replace(/ⅱ/g, 'II').replace(/ⅲ/g, 'III').replace(/ⅳ/g, 'IV');
-  s = s.replace(/IV$/, '4').replace(/III$/, '3').replace(/II$/, '2');
-  s = s.replace(/(^|[^I])I$/, function (m, p1) { return p1 + '1'; });
+  s = s.replace(/IV/g, '4').replace(/III/g, '3').replace(/II/g, '2')
+       .replace(/(^|[^I0-9])I(?![I0-9])/g, '$11');
+  s = s.replace(/[()\[\]{},.\-_~]/g, '');   // 괄호·구두점은 표기 흔들림일 뿐
   return s.toLowerCase();
 }
-// ---- 똑같은 파일이 두 번 올라와 있는 경우 하나로 합치기 --------------------
-// "동명 폴더"(같은 이름 폴더가 2개) 때문에 같은 시험지가 두 벌씩 들어있는 게
-// 실제로 확인됐다(520개를 다운받아 MD5 대조). 화면에서는 하나만 보여준다.
-// 판단 기준은 내용 해시(md5) 우선 - 파일명이 달라도 내용이 같은 경우가 45쌍
-// 있었기 때문. 해시가 없는 파일은 (파일명+크기)로 대신 판단한다.
+// 같은 시험이라도 2학년용/3학년용은 실제로 다른 시험지다. 이건 절대 합치면 안 되므로
+// 이름 정규화에서 떼어내 따로 비교한다.
+function detailGrade(s) {
+  if (!s) return '';
+  var m = /([1-3])\s*학년/.exec(s);
+  return m ? m[1] : '';
+}
+
 function contentKey(r) {
   if (r.md5) return 'h:' + r.md5;
   return 'n:' + r.filename + '|' + (r.size == null ? '' : r.size);
@@ -428,7 +436,10 @@ function editDistance1(a, b) { // 한 글자 이내 차이인가 (고금 vs 고�
 }
 function sameSubject(k1, k2) {
   var a = splitTrailingNum(k1), b = splitTrailingNum(k2);
-  if (a[1] !== b[1]) return false; // 뒤 숫자가 다르면 다른 과목(고급물리학1 vs 2)
+  // 뒤 숫자가 둘 다 적혀 있는데 다르면 다른 과목이다(고급물리학1 vs 2).
+  // 한쪽이 아예 안 적은 건 표기 생략일 뿐이라 같은 과목으로 본다
+  // ("선형대수학" 해설 / "선형대수학I" 문제 → 같은 시험).
+  if (a[1] && b[1] && a[1] !== b[1]) return false;
   var x = a[0], y = b[0];
   if (!x || !y) return false;
   return isSubsequence(x, y) || isSubsequence(y, x) || editDistance1(x, y);
@@ -440,42 +451,90 @@ function clusterGroup(group) {
   // 시험인 경우가 있어서, 중복처럼 보이는 걸 막으려면 무조건 라벨을 붙여야 함.
   var buckets = {};
   group.forEach(function (r) {
-    var norm = normDetail(r.subject_detail) || '__etc__';
-    if (!buckets[norm]) buckets[norm] = { label: r.subject_detail || '기타', records: [] };
-    buckets[norm].records.push(r);
+    var base = normDetail(r.subject_detail);
+    var grade = detailGrade(r.subject_detail);
+    var key = base ? base + '@' + grade : '__etc__';
+    if (!buckets[key]) {
+      buckets[key] = { label: r.subject_detail || '기타', base: base, grade: grade, records: [] };
+    }
+    buckets[key].records.push(r);
   });
 
-  // 별칭끼리 병합 (가장 파일이 많은 표기를 대표 이름으로)
-  var keys = Object.keys(buckets);
+  // 1차: 학년이 서로 어긋나지 않는 별칭끼리만 합친다.
+  // ("생명과학4(2학년)"과 "(생명과학IV, 3학년)"은 이름은 같아도 다른 시험지다)
   var merged = [];
-  keys.forEach(function (k) {
-    if (k === '__etc__') { merged.push({ keys: [k] }); return; }
-    for (var i = 0; i < merged.length; i++) {
-      if (merged[i].keys[0] !== '__etc__' && sameSubject(k, merged[i].keys[0])) {
-        merged[i].keys.push(k);
-        return;
+  Object.keys(buckets).forEach(function (k) {
+    var bk = buckets[k];
+    if (bk.base) {
+      for (var i = 0; i < merged.length; i++) {
+        var head = buckets[merged[i].keys[0]];
+        if (head.base && head.grade === bk.grade && sameSubject(bk.base, head.base)) {
+          merged[i].keys.push(k);
+          return;
+        }
       }
     }
     merged.push({ keys: [k] });
   });
-  // 파일명에 세부과목이 안 적힌 것(__etc__)은 따로 두면 "문제 없음 / 해설 없음"이
-  // 되어버린다. 이름이 붙은 그룹이 딱 하나뿐이면 그쪽 과목이 확실하므로 합친다.
-  // (이름 붙은 그룹이 여럿이면 어디에 속하는지 알 수 없으니 그대로 둔다)
-  if (merged.length === 2) {
-    var etcIdx = merged.findIndex(function (m) { return m.keys[0] === '__etc__'; });
-    if (etcIdx >= 0) {
-      var other = merged[1 - etcIdx];
-      other.keys = other.keys.concat(merged[etcIdx].keys);
-      merged = [other];
+
+  function recordsOf(m) {
+    var out = [];
+    m.keys.forEach(function (k) { out = out.concat(buckets[k].records); });
+    return out;
+  }
+  function headOf(m) { return buckets[m.keys[0]]; }
+
+  // 2차: 학년(또는 과목 표기 자체)이 안 적힌 그룹 붙이기.
+  // 파일명에 "2학년"이 안 적힌 문제지 한 장이 따로 떨어져 있으면 양쪽 다
+  // "문제 없음 / 해설 없음"이 되어버린다. 붙일 곳이 하나로 특정될 때만 붙인다:
+  // (1) 후보가 애초에 하나뿐이거나, (2) 이 그룹이 가진 문서(문제 또는 해설)를
+  //     아직 못 가진 후보가 딱 하나일 때.
+  var changed = true;
+  while (changed && merged.length > 1) {
+    changed = false;
+    for (var li = 0; li < merged.length; li++) {
+      var L = merged[li], lh = headOf(L);
+      if (lh.base && lh.grade) continue;          // 학년까지 적힌 그룹은 기준점
+      var cands = [];
+      for (var mi = 0; mi < merged.length; mi++) {
+        if (mi === li) continue;
+        var M = merged[mi], mh = headOf(M);
+        if (lh.base && !(mh.base && sameSubject(lh.base, mh.base))) continue;
+        cands.push(mi);
+      }
+      if (!cands.length) continue;
+      var target = null;
+      if (cands.length === 1) {
+        target = cands[0];
+      } else {
+        var mine = recordsOf(L);
+        var hasQ = mine.some(function (r) { return isProblem(r.doctype); });
+        var hasA = mine.some(function (r) { return isSolution(r.doctype); });
+        var needy = cands.filter(function (mi) {
+          var rs = recordsOf(merged[mi]);
+          var q = rs.some(function (r) { return isProblem(r.doctype); });
+          var aa = rs.some(function (r) { return isSolution(r.doctype); });
+          return (hasQ && !q) || (hasA && !aa);
+        });
+        if (needy.length === 1) target = needy[0];
+      }
+      if (target === null) continue;
+      merged[target].keys = merged[target].keys.concat(L.keys);
+      merged.splice(li, 1);
+      changed = true;
+      break;
     }
   }
+
   if (merged.length <= 1) return null; // 결국 다 같은 과목이면 나눌 의미 없음
 
   return merged.map(function (m) {
     var recs = [], best = null;
     m.keys.forEach(function (k) {
       recs = recs.concat(buckets[k].records);
-      if (!best || buckets[k].records.length > buckets[best].records.length) best = k;
+      // 대표 이름은 파일이 가장 많은 표기로 하되, 이름 없는 그룹(__etc__)은 피한다
+      if (!best || (buckets[k].base && (!buckets[best].base ||
+          buckets[k].records.length > buckets[best].records.length))) best = k;
     });
     return { label: buckets[best].label, records: recs };
   }).sort(function (a, b) { return b.records.length - a.records.length; });

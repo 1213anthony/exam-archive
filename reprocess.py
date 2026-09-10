@@ -36,6 +36,9 @@ for r in old:
 crawl.fill_missing_categories(records)
 crawl.split_numbered_variants(records)
 crawl.canonicalize_subjects(records)
+moved_container = crawl.split_container_subjects(records)
+# 과목 이름이 확정된 뒤에 해야 형제 파일을 제대로 찾는다
+filled = crawl.fill_missing_exam_fields(records)
 
 stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -51,3 +54,5 @@ with open("data.js", "w", encoding="utf-8") as f:
 
 subjects = {(r["category"], r["subject"]) for r in records}
 print(f"reprocessed {len(records)} records, {len(subjects)} distinct (category, subject) pairs")
+print(f"'문학' 같은 통 폴더에서 제 과목으로 옮긴 파일: {moved_container}개")
+print(f"형제 파일에서 빈 칸(연도/학기/시험종류)을 채운 파일: {filled}개")
