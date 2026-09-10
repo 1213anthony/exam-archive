@@ -646,6 +646,9 @@ def fill_missing_categories(records):
     EXTRA_CATEGORY = {
         "객체지향프로그래밍": "정보",
         "경제학": "사회",
+        # 시험지를 열어보니 수필 고쳐쓰기·칼럼 쓰기 문제였다. 영작문이 아니라
+        # 국어 작문이다(이름이 비슷해 외국어로 잡히고 있었음).
+        "작문": "국어",
     }
 
     def category_from_path(r):
@@ -667,7 +670,9 @@ def fill_missing_categories(records):
     for r in records:
         if r.get("category") or not r.get("subject"):
             continue
-        cat = lookup(r["subject"]) or category_from_path(r)
+        # 확정해둔 과목은 대응표보다 먼저 본다. 안 그러면 이름이 비슷한 과목에
+        # 부분 일치로 먼저 걸린다(작문 ⊂ 영작문 -> 외국어로 잘못 감).
+        cat = EXTRA_CATEGORY.get(re.sub(r"\s+", "", r["subject"])) or lookup(r["subject"]) or category_from_path(r)
         if cat:
             r["category"] = cat
             filled += 1
