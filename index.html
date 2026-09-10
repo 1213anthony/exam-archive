@@ -144,13 +144,6 @@
     background: transparent; color: var(--ink-soft);
   }
   .hidebtn:hover { border-color: var(--line); background: var(--line-soft); color: var(--ink); }
-  /* 같은 시험의 다른 스캔본을 펼쳐보는 버튼 */
-  .morebtn {
-    font: inherit; font-size: 11.5px; padding: 4px 7px; cursor: pointer;
-    border: 1px solid var(--line); border-radius: 4px;
-    background: var(--card); color: var(--ink-soft); white-space: nowrap;
-  }
-  .morebtn:hover { border-color: var(--accent); color: var(--accent); }
   .hiddennote {
     font-size: 12.5px; color: var(--ink-mid); background: var(--line-soft);
     border-radius: 4px; padding: 8px 12px; margin: 10px 0 0;
@@ -445,6 +438,28 @@ function sameSubject(k1, k2) {
   return isSubsequence(x, y) || isSubsequence(y, x) || editDistance1(x, y);
 }
 
+// 같은 시험의 같은 문서유형이 여러 벌 남는 경우가 있다(같은 시험지를 A4/B4로
+// 따로 스캔한 것 등). 내용이 조금씩 달라도 보는 사람 입장에선 한 장이면 되므로
+// 화면에는 한 장만 내보낸다. 고를 때는 용량이 가장 큰 것(=제일 온전한 스캔)을 쓴다.
+function pickBest(list) {
+  if (!list || !list.length) return null;
+  var best = list[0];
+  for (var i = 1; i < list.length; i++) {
+    if ((Number(list[i].size) || 0) > (Number(best.size) || 0)) best = list[i];
+  }
+  return best;
+}
+// 별지·듣기스크립트 같은 부속 자료도 문서유형별로 한 장씩만 남긴다
+function pickBestPerDoctype(list) {
+  var buckets = {}, order = [];
+  list.forEach(function (r) {
+    var k = r.doctype || '기타';
+    if (!buckets[k]) { buckets[k] = []; order.push(k); }
+    buckets[k].push(r);
+  });
+  return order.map(function (k) { return pickBest(buckets[k]); });
+}
+
 function clusterGroup(group) {
   // 세부과목(파일명 속 과목 표기)이 서로 다르면 파일 개수와 상관없이 항상 나눈다.
   // "문제 1 / 문제 2"처럼 보이지만 실은 고전문학과 현대문학처럼 서로 다른
@@ -587,8 +602,15 @@ function render() {
   // 데이터 생성 시각을 같이 보여준다 - 브라우저가 data.js를 캐시해서 옛날 걸
   // 보고 있는 경우를 바로 알아채려고 (안 바뀐 것 같으면 Ctrl+Shift+R)
   var ver = (typeof EXAM_DATA_VERSION !== 'undefined') ? EXAM_DATA_VERSION : null;
+  // 같은 파일이 여러 폴더에 중복돼 있고, 같은 시험지도 A4/B4로 따로 스캔돼
+  // 있어서 화면에는 시험마다 문제 한 장·해설 한 장만 내보낸다. 그래서
+  // '몇 개 파일'보다 '몇 개 시험'이 실제로 보이는 것과 맞는다.
+  var examSet = {};
+  rows.forEach(function (r) {
+    examSet[(r.category || '') + '|' + examKey(r)] = 1;
+  });
   document.getElementById('status').textContent =
-    rows.length + '개 파일 표시 중 (전체 ' + DATA.length + '개)' +
+    Object.keys(examSet).length + '개 시험  ·  파일 ' + rows.length + '개' +
     (ver ? '  ·  데이터 ' + ver : '');
 
   // 직접 숨긴 파일이 있으면 알려주고, 되돌리거나 삭제 목록으로 내보낼 수 있게 한다
@@ -717,9 +739,9 @@ function render() {
         var dupHidden = groupAll.length - group.length;
         var first = group[0];
 
-        var etc = group.filter(function (r) {
+        var etc = pickBestPerDoctype(group.filter(function (r) {
           return !isProblem(r.doctype) && !isSolution(r.doctype);
-        });
+        }));
 
         var row = document.createElement('div');
         row.className = 'exam';
@@ -757,13 +779,10 @@ function render() {
 
         var fn = document.createElement('div');
         fn.className = 'exam-files';
-        var names = group.map(function (r) { return r.filename; });
-        // 파일명이 4개씩 늘어서면 회색 글씨만 세 줄이 된다. 두 개까지만 보여주고
-        // 전체는 마우스를 올렸을 때 뜨게 한다.
-        fn.textContent = names.slice(0, 2).join('   ·   ')
-          + (names.length > 2 ? '   ·   외 ' + (names.length - 2) + '개' : '');
-        if (names.length > 2) fn.title = names.join('\n');
         label.appendChild(fn);
+        // 실제로 화면에 나온 파일 이름만 적는다. 숨긴 판본 이름까지 적어두면
+        // "버튼은 하나인데 파일명은 넷"이라 오히려 헷갈린다. (아래에서 채움)
+        var shownRecs = etc.slice();
 
         // 문제/해설로 분류 안 되는 파일은 따로 링크로
         if (etc.length) {
@@ -785,55 +804,25 @@ function render() {
         row.appendChild(label);
 
         function addBtns(list, cls, text, container) {
-          if (!list.length) {
+          var rec = pickBest(list);
+          if (!rec) {
             var none = document.createElement('span');
             none.className = 'btn-none';
             none.textContent = text + ' 없음';
             container.appendChild(none);
             return;
           }
-          // 같은 시험의 같은 문서유형이 여러 개 남는 경우가 있다(같은 해설인데
-          // 스캔본이 달라 내용 해시가 다른 것). 한 줄에 "해설 1 / 해설 2"가
-          // 늘어서면 지저분하므로 하나만 보여주고 나머지는 접어둔다.
-          var primary = list[0], alternates = list.slice(1);
-          [primary].forEach(function (r) {
-            var wrap = document.createElement('span');
-            wrap.className = 'btn-wrap';
-            wrap.appendChild(makeCheckbox(r));
-            var a = document.createElement('a');
-            a.className = 'btn ' + cls;
-            a.href = viewUrl(r); a.target = '_blank'; a.rel = 'noopener';
-            a.textContent = text;
-            wrap.appendChild(a);
-            container.appendChild(wrap);
-          });
-
-          if (alternates.length) {
-            var more = document.createElement('button');
-            more.className = 'morebtn';
-            more.textContent = '+' + alternates.length;
-            more.title = '같은 시험의 다른 ' + text + ' 파일 ' + alternates.length + '개 (스캔본이 다름)';
-            var shown = false;
-            var box = document.createElement('span');
-            box.className = 'btn-wrap';
-            box.hidden = true;
-            alternates.forEach(function (r, i) {
-              box.appendChild(makeCheckbox(r));
-              var a2 = document.createElement('a');
-              a2.className = 'btn ' + cls;
-              a2.href = viewUrl(r); a2.target = '_blank'; a2.rel = 'noopener';
-              a2.textContent = text + ' ' + (i + 2);
-              box.appendChild(a2);
-            });
-            more.addEventListener('click', function (e) {
-              e.preventDefault();
-              shown = !shown;
-              box.hidden = !shown;
-              more.textContent = shown ? '−' : '+' + alternates.length;
-            });
-            container.appendChild(more);
-            container.appendChild(box);
-          }
+          // 같은 문서유형이 여러 벌이어도 한 장만 내보낸다 (pickBest 주석 참고)
+          shownRecs.push(rec);
+          var wrap = document.createElement('span');
+          wrap.className = 'btn-wrap';
+          wrap.appendChild(makeCheckbox(rec));
+          var a = document.createElement('a');
+          a.className = 'btn ' + cls;
+          a.href = viewUrl(rec); a.target = '_blank'; a.rel = 'noopener';
+          a.textContent = text;
+          wrap.appendChild(a);
+          container.appendChild(wrap);
         }
 
         var clusters = clusterGroup(group);
@@ -866,6 +855,11 @@ function render() {
           });
           row.appendChild(btnsWrap);
         }
+
+        var names = shownRecs.map(function (r) { return r.filename; });
+        fn.textContent = names.slice(0, 2).join('   ·   ')
+          + (names.length > 2 ? '   ·   외 ' + (names.length - 2) + '개' : '');
+        if (names.length > 2) fn.title = names.join('\n');
 
         body.appendChild(row);
       });
