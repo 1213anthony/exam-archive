@@ -28,6 +28,15 @@ import json
 import os
 import sys
 
+# 윈도우 기본 콘솔(cp949)은 "창의융합특강Ⅻ" 같은 글자를 못 찍고 죽는다.
+# 삭제 도중에 터지면 어디까지 지웠는지 알기 어려우니 출력 인코딩을 UTF-8로
+# 바꾸고, 그래도 안 되는 글자는 물음표로 대체한다.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
