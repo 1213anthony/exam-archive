@@ -639,6 +639,45 @@ def slim_for_web(records):
     return [{k: r.get(k) for k in WEB_FIELDS if r.get(k) is not None} for r in records]
 
 
+_SUBJ_NUM_RE = re.compile(r"^(.*?)([1-4])$")
+
+
+def _base_and_num(subject):
+    """'독서3' -> ('독서', '3'). 로마숫자도 숫자로 맞춰서 비교한다.
+    '고급지구과학1,2'처럼 여러 번호를 묶어 적은 폴더는 번호를 뗀 이름만 돌려준다
+    (어느 한 번호로 볼 수 없으니 파일명 쪽을 따르게 된다)."""
+    s = norm_subject(subject or "")
+    m = re.match(r"^(.*?)([1-4])(?:\s*[,·/]\s*[1-4])+$", s)
+    if m:
+        return (m.group(1), "")
+    m = _SUBJ_NUM_RE.match(s)
+    return (m.group(1), m.group(2)) if m else (s, "")
+
+
+def split_numbered_variants(records):
+    """폴더는 '독서1'인데 파일명은 '독서3'인 것들을 파일명 쪽으로 옮긴다.
+
+    같은 이름에 번호만 다른 과목(독서1/독서3, 지구과학2/지구과학3 …)이
+    한 폴더에 섞여 들어가 있는 경우가 많다. 이건 표기 흔들림이 아니라
+    실제로 다른 과목이므로, 더 구체적인 파일명 쪽을 따른다.
+    ('문학' 폴더 안의 '현대문학'처럼 이름 자체가 다른 건 건드리지 않는다 -
+     그건 세부과목 묶음으로 화면에서 따로 보여주고 있다.)
+    """
+    moved = 0
+    for r in records:
+        detail, subject = r.get("subject_detail"), r.get("subject")
+        if not detail or not subject:
+            continue
+        base_s, num_s = _base_and_num(subject)
+        base_d, num_d = _base_and_num(detail)
+        # 폴더에 번호가 아예 없는 경우도 포함한다.
+        # ("고급지구과학" 폴더에 고급지구과학1과 2가 같이 들어있는 식)
+        if base_s and base_s == base_d and num_d and num_s != num_d:
+            r["subject"] = detail
+            moved += 1
+    return moved
+
+
 def canonicalize_subjects(records):
     """같은 과목인데 표기만 다른 것을 한 이름으로 합친다.
     띄어쓰기 차이('우주론 I' / '우주론I')뿐 아니라 로마숫자 차이도 본다 -
@@ -655,7 +694,15 @@ def canonicalize_subjects(records):
         key = (r.get("category"), norm_subject(subj).lower())
         variants[key][subj] += 1
 
-    canonical = {k: c.most_common(1)[0][0] for k, c in variants.items()}
+    # 대표 표기는 많이 쓰인 순으로 고르되, 같은 횟수면 로마숫자(고급지구과학II)보다
+    # 아라비아 숫자(고급지구과학2)를 쓴다. 화면에서 과목 목록이 뒤섞여 보이지 않게.
+    def pick(counter):
+        return sorted(
+            counter.items(),
+            key=lambda kv: (-kv[1], bool(re.search(r"[ⅠⅡⅢⅣIV]", kv[0])), kv[0]),
+        )[0][0]
+
+    canonical = {k: pick(c) for k, c in variants.items()}
     for r in records:
         subj = r.get("subject")
         if not subj:
@@ -890,6 +937,9 @@ def main():
     filled, unknown = fill_missing_categories(records)
     if filled or unknown:
         print(f"  분류가 없던 기록 {filled}개는 과목 이름으로 채움, {unknown}개는 못 찾음")
+    moved = split_numbered_variants(records)
+    if moved:
+        print(f"  폴더와 파일명의 과목 번호가 다른 {moved}개는 파일명 쪽으로 옮김")
     canonicalize_subjects(records)
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(records, f, ensure_ascii=False, indent=2)
