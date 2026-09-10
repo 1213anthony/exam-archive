@@ -59,11 +59,23 @@ def get_service():
             if not os.path.exists("credentials.json"):
                 sys.exit("credentials.json이 없습니다. crawl.py 때 쓰던 파일을 같은 폴더에 두세요.")
             print("드라이브 쓰기 권한 승인이 필요합니다. 브라우저가 열립니다...")
+            print("※ 파일을 만든 계정으로 로그인해야 합니다. 다른 계정은 삭제 권한이 없습니다.")
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", WRITE_SCOPES)
-            creds = flow.run_local_server(port=0)
+            # prompt="select_account"가 없으면 이전에 쓰던 계정으로 그냥 넘어가서
+            # 엉뚱한 계정으로 로그인되기 쉽다. 항상 계정 선택 화면을 띄운다.
+            creds = flow.run_local_server(port=0, prompt="select_account")
         with open(WRITE_TOKEN, "w") as f:
             f.write(creds.to_json())
-    return build("drive", "v3", credentials=creds)
+
+    service = build("drive", "v3", credentials=creds)
+    # 어느 계정으로 로그인됐는지 알려준다. 권한 없는 계정으로 붙으면
+    # 파일마다 실패만 잔뜩 나서 원인을 찾기 어렵다.
+    try:
+        me = service.about().get(fields="user(emailAddress)").execute()["user"]
+        print(f"로그인 계정: {me['emailAddress']}")
+    except Exception:
+        pass
+    return service
 
 
 def load_targets(path):
@@ -105,6 +117,24 @@ def do_trash(targets, dry_run):
         sys.exit("취소했습니다. 아무것도 지우지 않았습니다.")
 
     service = get_service()
+
+    # 지울 권한이 있는지 첫 파일로 미리 확인한다. 권한 없는 계정으로 붙으면
+    # 2천 개가 전부 실패하면서 시간만 버리게 된다.
+    try:
+        probe = service.files().get(
+            fileId=targets[0]["id"], fields="capabilities(canTrash)"
+        ).execute()
+        if not probe.get("capabilities", {}).get("canTrash"):
+            sys.exit(
+                "\n이 계정에는 파일을 지울 권한이 없습니다(보기 전용으로 공유받은 상태).\n"
+                "파일을 만든 계정으로 로그인해야 합니다.\n"
+                f"계정을 바꾸려면 {WRITE_TOKEN} 파일을 지우고 다시 실행하세요."
+            )
+    except SystemExit:
+        raise
+    except Exception as e:
+        sys.exit(f"권한 확인 중 오류: {e}")
+
     stamp = datetime.datetime.now().isoformat(timespec="seconds")
     done = failed = 0
     with open(LOG_PATH, "a", encoding="utf-8") as log:
