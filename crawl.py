@@ -266,6 +266,11 @@ MANUAL_OVERRIDES = {
     "1o-qc8mJZBm4IWdfO_1OCQp2yQbG80d4G": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
     "1OZcoDRJFdi-abXSihZEEQzzHeriHft5I": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
 
+    # "01_문제지_위상수학과 곡면_20201학기_기말고사.pdf" - 연도와 학기가 붙어 있어
+    # (20201학기) 파싱이 안 되고, 폴더도 "창융특"뿐이라 과목이 분류 이름이 돼버린다.
+    "1D0nl45SjtZAfde26CUBf5DG2mYHX4nqJ": {"year": "2020", "semester": "1", "examtype": "기말고사", "subject": "위상수학과 곡면"},
+    "1aw2TvTPpFtpnGzWaEiW_DhdoJUM_d4f1": {"year": "2020", "semester": "1", "examtype": "기말고사", "subject": "위상수학과 곡면"},
+
     # ---- 남아 있던 미분류 52개를 표지 대조로 전부 확정 ----------------------
     # 파일명만으로는 연도/학기를 알 수 없는 것들이라 PDF 표지를 직접 읽어서 넣었다.
     "1ZQ0T69WENYPdCh4z0qQ2TB1xGv3NugZn": {"year": "2013", "semester": "1", "examtype": "중간고사"},
@@ -495,7 +500,7 @@ def derive_subject(folder_path, category):
         for a in aliases:
             if s.startswith(a + " "):
                 s = s[len(a) + 1:].strip()
-        return re.sub(r"\s+", " ", s)
+        return apply_subject_alias(re.sub(r"\s+", " ", s))
     return category
 
 
@@ -504,7 +509,60 @@ def derive_subject(folder_path, category):
 # 분류(국어/물리/…)가 아예 없고 대신 이수 구분(기본선택/심화선택/N학년)이 온다.
 # 과목은 문서유형·연도 폴더를 뺀 마지막 칸이다.
 SECOND_ROOT_HEAD_RE = re.compile(r"\d\s*학기\s*(중간|기말)고사\s*기출")
-SECOND_ROOT_TRACK_RE = re.compile(r"^(기본선택|심화선택|기본필수|심화필수|공통|\d학년)$")
+SECOND_ROOT_TRACK_RE = re.compile(
+    # 이수 구분·학년뿐 아니라 "창융특"처럼 분류 이름만 적힌 묶음 폴더도
+    # 과목이 아니다(그 밑의 실제 과목 이름을 써야 한다)
+    r"^(기본선택|심화선택|기본필수|심화필수|공통|\d학년|창융특|창의융합특강)$"
+)
+
+
+# 폴더 이름이 축약형이거나 오타인 경우. 왼쪽(공백 제거 기준)을 오른쪽으로 바꾼다.
+# 축약형은 폴더에만 쓰이고 파일명에는 제대로 적혀 있는 경우가 많다.
+SUBJECT_ALIASES = {
+    "데공지능": "데이터와 인공지능",
+    "공위적정": "공동체를 위한 적정기술 설계",
+    "공위적성": "공동체를 위한 적정기술 설계",
+    "정법": "정치와법",
+    "확룰과통계": "확률과통계",       # 폴더 이름 오타(확률 -> 확룰)
+    "기초통계학": "확률과통계",       # 같은 과목의 옛 이름
+    "로봇공학기초실습2": "로봇공학실습2",
+    "고급지구과학1,2": "고급지구과학",  # 두 과목을 한 폴더에 묶어둔 이름
+    "양자정보특강": "양자정보특강1",     # 파일은 모두 양자정보특강1
+}
+
+# 폴더 이름 끝에 시험 종류가 붙어버린 경우 ("국어1-중간" -> "국어1")
+SUBJECT_EXAM_SUFFIX_RE = re.compile(r"[\s\-_]*(중간|기말)(고사)?$")
+# 과목 이름 끝의 로마숫자는 아라비아 숫자로 통일한다 ("추상대수학 II" -> "추상대수학2")
+SUBJECT_TRAILING_ROMAN_RE = re.compile(r"^(.*?)[\s]*(Ⅰ|Ⅱ|Ⅲ|Ⅳ|IV|III|II|I)$")
+_ROMAN_TO_NUM = {"Ⅰ": "1", "Ⅱ": "2", "Ⅲ": "3", "Ⅳ": "4",
+                 "I": "1", "II": "2", "III": "3", "IV": "4"}
+
+
+def apply_subject_alias(subject):
+    if not subject:
+        return subject
+    # 파일명에서 온 이름은 지저분한 경우가 많다.
+    #   "창융특_분자건축" / "창융특4 최신화학연구논문읽기" -> 묶음 이름과 번호를 뗀다
+    #   "(심리학)(최종)" -> 괄호와 꼬리표를 뗀다
+    subject = re.sub(r"^(창의융합특강|창융특)\s*[0-9IVXⅠ-Ⅻ]*\s*[_\-\s]*", "", subject).strip()
+    subject = re.sub(r"\((최종|수정|재시험)\)", "", subject).strip()
+    if subject.startswith("(") and subject.endswith(")"):
+        subject = subject[1:-1].strip()
+    if not subject:
+        return None
+    # "국어1-중간"처럼 시험 종류가 붙어버린 폴더 이름을 먼저 정리
+    stripped = SUBJECT_EXAM_SUFFIX_RE.sub("", subject).strip()
+    if stripped and stripped != subject and not re.fullmatch(r"[\s\-_]*", stripped):
+        subject = stripped
+    # 과목 끝 로마숫자를 아라비아 숫자로 ("추상대수학 II" -> "추상대수학2")
+    m = SUBJECT_TRAILING_ROMAN_RE.match(subject)
+    if m and m.group(1).strip():
+        subject = m.group(1).strip() + _ROMAN_TO_NUM[m.group(2)]
+    key = re.sub(r"\s+", "", subject)
+    if key in SUBJECT_ALIASES:
+        return SUBJECT_ALIASES[key]
+    key2 = norm_subject(subject)
+    return SUBJECT_ALIASES.get(key2, subject)
 
 
 def derive_subject_second_root(folder_path):
@@ -528,7 +586,12 @@ def derive_subject_second_root(folder_path):
         # "2024_1학기 기말 모범답안"처럼 시험 회차를 적어둔 묶음 폴더도 과목이 아니다
         if re.search(r"\d{4}.*(중간|기말)", s):
             continue
-        return re.sub(r"\s+", " ", s)
+        # "창융특 고체물리" -> "고체물리" (묶음 이름이 앞에 붙은 경우)
+        for pre in ("창의융합특강", "창융특"):
+            if s.startswith(pre + " "):
+                s = s[len(pre):].strip()
+                break
+        return apply_subject_alias(re.sub(r"\s+", " ", s))
     return None
 
 
@@ -663,6 +726,21 @@ def split_numbered_variants(records):
     ('문학' 폴더 안의 '현대문학'처럼 이름 자체가 다른 건 건드리지 않는다 -
      그건 세부과목 묶음으로 화면에서 따로 보여주고 있다.)
     """
+    # 먼저 "이 폴더 안에 실제로 번호가 여러 개 섞여 있는가"를 센다.
+    # 번호 변형이 하나뿐이면(선형대수학 폴더에 선형대수학I만 있는 식) 표기 흔들림일
+    # 뿐이라 나누면 안 된다. 나누면 5개짜리 과목이 따로 생겨버린다.
+    from collections import defaultdict
+
+    nums_in_folder = defaultdict(set)
+    for r in records:
+        detail, subject = r.get("subject_detail"), r.get("subject")
+        if not detail or not subject:
+            continue
+        base_s, _ = _base_and_num(subject)
+        base_d, num_d = _base_and_num(detail)
+        if base_s and base_s == base_d and num_d:
+            nums_in_folder[(r.get("category"), base_s)].add(num_d)
+
     moved = 0
     for r in records:
         detail, subject = r.get("subject_detail"), r.get("subject")
@@ -670,11 +748,13 @@ def split_numbered_variants(records):
             continue
         base_s, num_s = _base_and_num(subject)
         base_d, num_d = _base_and_num(detail)
-        # 폴더에 번호가 아예 없는 경우도 포함한다.
-        # ("고급지구과학" 폴더에 고급지구과학1과 2가 같이 들어있는 식)
-        if base_s and base_s == base_d and num_d and num_s != num_d:
-            r["subject"] = detail
-            moved += 1
+        if not (base_s and base_s == base_d and num_d and num_s != num_d):
+            continue
+        # 폴더에 번호가 없더라도(고급지구과학) 안에 1과 2가 같이 있으면 나눈다
+        if len(nums_in_folder[(r.get("category"), base_s)] | {num_s} - {""}) < 2:
+            continue
+        r["subject"] = detail
+        moved += 1
     return moved
 
 
@@ -745,6 +825,10 @@ def parse_record(filename, folder_path, drive_id, layout="분류먼저"):
         if category == "창융특":
             category = "창의융합특강"
         subject = derive_subject(folder_path, category) if category else None
+        # "창융특" 폴더처럼 경로에 분류 이름만 있고 과목이 없으면, 과목 이름이
+        # 분류와 똑같아져 버린다. 이럴 땐 파일명에 적힌 과목을 쓴다.
+        if subject and subject == category and fname_meta.get("subject_raw"):
+            subject = apply_subject_alias(fname_meta["subject_raw"])
     folder_semester, folder_examtype = folder_semester_examtype(folder_path)
 
     fname_semester = fname_meta.get("semester")
