@@ -236,6 +236,71 @@ MANUAL_OVERRIDES = {
     "1o-qc8mJZBm4IWdfO_1OCQp2yQbG80d4G": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
     "1OZcoDRJFdi-abXSihZEEQzzHeriHft5I": {"year": "2012", "semester": "2", "examtype": "기말고사", "doctype": "모범답안및해설"},
 
+    # ---- 남아 있던 미분류 52개를 표지 대조로 전부 확정 ----------------------
+    # 파일명만으로는 연도/학기를 알 수 없는 것들이라 PDF 표지를 직접 읽어서 넣었다.
+    "1ZQ0T69WENYPdCh4z0qQ2TB1xGv3NugZn": {"year": "2013", "semester": "1", "examtype": "중간고사"},
+    "1ghDsakkq84rQC_HHwG_g-WZnSh6bhTlA": {"year": "2022", "semester": "1", "examtype": "중간고사"},
+    "1qE8wdINB0csWrGuFU2Ow3RidIlSbMWGR": {"year": "2013", "semester": "1", "examtype": "기말고사"},
+    "1jJ1p_CIpHReer-w0YbVLYSFtdpC5crF1": {"year": "2014", "semester": "1", "examtype": "기말고사"},
+    "1jdp8rsZVYMShECYF9hH9BTClfXLVF1hC": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1ozCuxTH41J5TZ8X5cJaZASYWFPxKL5gh": {"year": "2011", "semester": "1", "examtype": "기말고사"},
+    "1qfGUIEpwIwmQMtHMXdVgAQjgvXo2cTyP": {"year": "2011", "semester": "1", "examtype": "기말고사"},
+    "1RCDxI_zQCyQsNC1XUHCLZU6JnU2haz7n": {"year": "2014", "semester": "2", "examtype": "기말고사"},
+    "1AEwc5pEQdmdvwig-N51E1ghg0jjMJLwj": {"year": "2012", "semester": "1", "examtype": "기말고사"},
+    "1EZ-4KMpYpRa9jUm3rAWxrKXPdgishCBa": {"year": "2012", "semester": "2", "examtype": "기말고사"},
+    "1rfGFGprJiYuwasHQwJ4oIS5uw3tLXvEI": {"year": "2011", "semester": "1", "examtype": "기말고사"},
+    "1Qriik4Nj4_4FVEKAp7DyIvAnEQ3tD6HE": {"year": "2011", "semester": "1", "examtype": "기말고사"},
+    "1X6JoDC2VvJzmmKRtbBK4ASq8sRE55yG4": {"year": "2013", "semester": "1", "examtype": "기말고사"},
+    "1bQifV9wAhBXsdKnlYtB9nxwaDmUjoZh2": {"year": "2013", "semester": "1", "examtype": "기말고사"},
+    "1UYKZDrO8DgHGbbam6RMiJYnH1oMztbQ5": {"year": "2013", "semester": "2", "examtype": "중간고사"},
+    "1o-_S_c1rZlU9Pt4HAMsI5Qd_IJDeVAMY": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1ziUrcQptIRuza-DiQrozDqkycjot8dag": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1wO-kZ9XkBbqrftTFjVPNinKWIYr12HdO": {"year": "2013", "semester": "2", "examtype": "중간고사"},
+    "19HsZCEymbOL-gW7mDh6qwmXb9cGXQ-Qc": {"year": "2019", "semester": "2", "examtype": "기말고사"},
+    "17hT8x4xZeB8H6ureJKsusu0AwkHByVUS": {"year": "2021", "semester": "1", "examtype": "기말고사"},
+    "1RxjJZniP9PS8xEKQc0f7JafVGVxeq0i7": {"year": "2012", "semester": "2", "examtype": "기말고사"},
+    "1EBJid9YvZgRO-DZl73VJ2ZWMRetvod-v": {"year": "2012", "semester": "2", "examtype": "기말고사"},
+    "1fjM_6mAkEI6B6bksV4uZUFZjdOxhpzB5": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1BMo_nTK75-Hd-tN9VHFkvRzubfqS-fLs": {"year": "2013", "semester": "1", "examtype": "기말고사"},
+    "1K-Ee8AuRedAgxn9tAp60dyaC_XyUFqGm": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1TfDii-NfDqe0HhbX8x3QeTW2C5K1UcW1": {"year": "2014", "semester": "1", "examtype": "기말고사"},
+    "1zuJzOBayY7eFin2-OxAHfGGWEXpkI2i7": {"year": "2013", "semester": "1", "examtype": "기말고사"},
+    "1RLICW-JuOPX0j7cMcOk0u6rulWPq404o": {"year": "2012", "semester": "2", "examtype": "기말고사"},
+    "1OyzuL-N8H7nnlB10jvLX5lCPePJm_Kdn": {"year": "2012", "semester": "2", "examtype": "기말고사"},
+    "1dey6kZ9pdiK1ricS5W_x-XWanl4Ce3B5": {"year": "2013", "semester": "1", "examtype": "기말고사"},
+    "18Sz-xnvU4pSyVFy8I9Yb5BlogZKa4PSX": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1vr-GvSQ599xNHuLNgvJaSTuBBt_DvdNZ": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "16IZEAEJS20Flizok13kkTxb2Ib0bSYi7": {"year": "2014", "semester": "2", "examtype": "기말고사"},
+    "1vdmtxspBkHTcPJ3bBsdmeS0Yf0khO081": {"year": "2021", "semester": "2", "examtype": "기말고사"},
+    "1j3S0_DswrmhgIaP-Zf-Z7ktm0icuPV8r": {"year": "2020", "semester": "2", "examtype": "기말고사"},
+    "101eoqMVh7aAS3zo7NoCp1b-DnBfxNEvr": {"year": "2020", "semester": "2", "examtype": "기말고사"},
+    "16XUCgF0xqH0uRHQuiioy1hVOVhV9ZFzu": {"year": "2023", "semester": "2", "examtype": "기말고사"},
+    "1pr1k3EXuWe_nLTposuXgEyz4XT8lssQg": {"year": "2023", "semester": "2", "examtype": "기말고사"},
+    "1sVjuvSBGmX7ee-xcgH85PV7Br-EDVtVw": {"year": "2012", "semester": "2", "examtype": "기말고사"},
+
+    # 표지 글자가 뒤죽박죽이라 정규식으로는 못 읽고 직접 눈으로 확인한 것들
+    "1di9X6kNJ6fgDN6TxV_F6Qmoq9vWGt8Ge": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1-wRa_6eGUssWh4FdwOR_0mglLf1zEk6l": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "122_YJGjsdWeiyu8w3m_y0OYqtppXn4p6": {"year": "2012", "semester": "2", "examtype": "기말고사"},
+    "1jFIwmdXEbuKqP2GskM_ZtasgaNIBmdTZ": {"year": "2014", "semester": "1", "examtype": "기말고사"},
+    "11DwNgZOjuEcVZcmpb5QUnfh4JW6LrM6c": {"year": "2013", "semester": "2", "examtype": "기말고사"},
+    "1kBBfgFDk3174upUFIcbMATyOIisjI0EA": {"year": "2011", "semester": "1", "examtype": "기말고사"},
+    "1MrIL_zOzI2MAx7a_cuU3gKEaNyvEKuNm": {"year": "2011", "semester": "1", "examtype": "기말고사"},
+    "1CDZ1aIQw4d9nLnvOVLG6kaQoa_438-S9": {"year": "2014", "semester": "1", "examtype": "기말고사"},
+
+    # 커뮤니케이션 겨울계절수업 - 표지가 전부 "2014학년도 (겨울 계절수업)고사,
+    # 2015년 1월 27일 시행"이다. 1/2학기가 아니라서 학기는 비우고 시험종류에
+    # 적어둔다. 이름만 다른 같은 시험이 네 벌 올라와 있어 한 줄로 묶인다.
+    "1fBjM1OQg7lAAKVJkgBn1RQ9i67IylCVe": {"year": "2014", "semester": None, "examtype": "겨울 계절수업"},
+    "1ZaJyJvApwTRyRfKC3qo88gddMXDk_vyd": {"year": "2014", "semester": None, "examtype": "겨울 계절수업"},
+    "16epcpKccECKp5L89vyk16c9XaH7gMgAZ": {"year": "2014", "semester": None, "examtype": "겨울 계절수업"},
+    "1UHHmCogthmuSPKgunUIWnSjTLHwdDm7J": {"year": "2014", "semester": None, "examtype": "겨울 계절수업"},
+
+    # 파일이 깨져 있어 열리지 않는다(4KB, PDF 헤더 없음). 같은 폴더에 정상적인
+    # "01_문제지_(물리학1) 중간고사 문제지.pdf"(2013년 1학기 중간)가 있으므로
+    # 이 파일은 지워도 된다. 값은 표지를 못 읽어 폴더 기준만 남긴다.
+    "15FAg-llKvTwvBkx636JpxSYy__rf-hSv": {"year": None, "semester": "1", "examtype": "중간고사"},
+
     # 아래 6개는 파일명 형식이 하나뿐이라 정규식을 새로 만들 값어치가 없고,
     # 화면에 뜨는 값은 이미 정확해서 "확정"으로만 표시한다(미분류 딱지 제거).
     #   "2014_계절학기기말_..."  계절학기 표기라 학기 숫자가 없음
@@ -481,7 +546,10 @@ def norm_subject(s):
 
 
 def canonicalize_subjects(records):
-    """'우주론 I'과 '우주론I'처럼 띄어쓰기만 다른 과목을 한 이름으로 합친다.
+    """같은 과목인데 표기만 다른 것을 한 이름으로 합친다.
+    띄어쓰기 차이('우주론 I' / '우주론I')뿐 아니라 로마숫자 차이도 본다 -
+    두 최상위 폴더가 서로 '국어I'과 '국어1'처럼 다르게 적어놔서, 그냥 두면
+    똑같은 시험이 과목이 다르다는 이유로 두 줄로 갈라진다.
     표기는 실제로 가장 많이 쓰인 쪽을 대표로 삼는다(이름을 임의로 뭉개지 않음)."""
     from collections import Counter, defaultdict
 
@@ -490,7 +558,7 @@ def canonicalize_subjects(records):
         subj = r.get("subject")
         if not subj:
             continue
-        key = (r.get("category"), re.sub(r"\s+", "", subj).lower())
+        key = (r.get("category"), norm_subject(subj).lower())
         variants[key][subj] += 1
 
     canonical = {k: c.most_common(1)[0][0] for k, c in variants.items()}
@@ -498,7 +566,7 @@ def canonicalize_subjects(records):
         subj = r.get("subject")
         if not subj:
             continue
-        key = (r.get("category"), re.sub(r"\s+", "", subj).lower())
+        key = (r.get("category"), norm_subject(subj).lower())
         r["subject"] = canonical.get(key, subj)
 
 
@@ -642,7 +710,9 @@ def list_children(service, folder_id):
     while True:
         resp = service.files().list(
             q=f"'{folder_id}' in parents and trashed = false",
-            fields="nextPageToken, files(id, name, mimeType, modifiedTime, size)",
+            # md5Checksum은 드라이브가 이미 갖고 있는 값이라 파일을 받지 않아도
+            # 그냥 얻을 수 있다. 이름만 다르고 내용은 같은 중복을 합치는 데 쓴다.
+            fields="nextPageToken, files(id, name, mimeType, modifiedTime, size, md5Checksum)",
             pageSize=1000,
             pageToken=page_token,
         ).execute()
@@ -690,6 +760,8 @@ def crawl(service, folder_id, folder_path):
             rec["duplicate_folder_modified"] = None
             rec["modified_time"] = child.get("modifiedTime")
             rec["size"] = int(child["size"]) if child.get("size") else None
+            # 드라이브가 준 해시를 쓰고, 없으면 예전에 직접 받아 계산해둔 값을 쓴다
+            rec["md5"] = child.get("md5Checksum") or MD5_CACHE.get(child["id"])
             records.append(rec)
     return records
 

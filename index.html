@@ -453,6 +453,17 @@ function clusterGroup(group) {
     }
     merged.push({ keys: [k] });
   });
+  // 파일명에 세부과목이 안 적힌 것(__etc__)은 따로 두면 "문제 없음 / 해설 없음"이
+  // 되어버린다. 이름이 붙은 그룹이 딱 하나뿐이면 그쪽 과목이 확실하므로 합친다.
+  // (이름 붙은 그룹이 여럿이면 어디에 속하는지 알 수 없으니 그대로 둔다)
+  if (merged.length === 2) {
+    var etcIdx = merged.findIndex(function (m) { return m.keys[0] === '__etc__'; });
+    if (etcIdx >= 0) {
+      var other = merged[1 - etcIdx];
+      other.keys = other.keys.concat(merged[etcIdx].keys);
+      merged = [other];
+    }
+  }
   if (merged.length <= 1) return null; // 결국 다 같은 과목이면 나눌 의미 없음
 
   return merged.map(function (m) {
