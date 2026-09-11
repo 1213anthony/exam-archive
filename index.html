@@ -197,8 +197,6 @@
   }
   #downloadBtn { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
   #downloadBtn:hover { background: var(--blue); color: #fff; }
-  #deleteListBtn { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
-  #deleteListBtn:hover { background: var(--red); border-color: var(--red); }
   #clearSelBtn { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
   #clearSelBtn:hover { border-color: #fff; }
 
@@ -232,7 +230,6 @@
 <div class="selectbar" id="selectbar" style="display:none;">
   <span id="selcount"></span>
   <button id="downloadBtn">선택한 파일 다운로드</button>
-  <button id="deleteListBtn" title="선택한 파일들의 목록을 to_delete.txt로 저장합니다. 그 파일을 delete_files.py로 넘기면 드라이브 휴지통으로 이동합니다(완전 삭제 아님)">삭제 목록 내보내기</button>
   <button id="clearSelBtn">선택 해제</button>
 </div>
 
@@ -311,30 +308,6 @@ function setCatClosed(c, closed) {
 function isHidden(r) { return !!hidden[r.id]; }
 function unhideAll() { hidden = {}; saveMap(HIDDEN_KEY, hidden); }
 
-// 파일 목록을 to_delete.txt로 저장한다. 이 페이지는 드라이브를 못 고치므로
-// (읽기 전용) 목록만 만들고, 실제 삭제는 delete_files.py가 확인 절차를 거쳐 한다.
-function exportDeleteList(records) {
-  if (!records || !records.length) return;
-  var lines = [
-    '# 기출문제 아카이브 - 삭제 예정 목록',
-    '# 만든 시각: ' + new Date().toLocaleString('ko-KR'),
-    '# 사용법: python delete_files.py to_delete.txt',
-    '#   먼저 확인만 하려면: python delete_files.py to_delete.txt --dry-run',
-    '# 완전 삭제가 아니라 드라이브 휴지통으로 이동합니다.',
-    ''
-  ];
-  records.forEach(function (r) { lines.push(r.id + '\t' + (r.filename || '')); });
-  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'to_delete.txt';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-}
-
 var state = { cat: null, q: '', flagOnly: false, favOnly: loadFavOnly(), selected: {} };
 
 // ---- 선택 다운로드 ----
@@ -410,6 +383,15 @@ function isFlagged(r) {
 function examKey(r) {
   return [r.subject, r.year || '?', r.semester || '?', r.examtype || '?'].join('|');
 }
+// 한 해 안에서 시험이 실제로 치러지는 순서. 큰 값일수록 최근이다.
+// 겨울 계절수업은 2학기 기말(12월) 다음인 이듬해 1월에 본다.
+function examOrder(semester, examtype) {
+  var t = examtype || '';
+  if (t.indexOf('계절') >= 0) return 5;
+  var base = semester === '2' ? 2 : (semester === '1' ? 0 : -2);
+  return base + (t.indexOf('기말') >= 0 ? 2 : 1);
+}
+
 function matchesQuery(r, q) {
   if (!q) return true;
   var hay = [r.category, r.subject, r.year, r.semester, r.examtype, r.doctype, r.filename]
@@ -670,7 +652,7 @@ function render() {
     Object.keys(examSet).length + '개 시험  ·  파일 ' + rows.length + '개' +
     (ver ? '  ·  데이터 ' + ver : '');
 
-  // 직접 숨긴 파일이 있으면 알려주고, 되돌리거나 삭제 목록으로 내보낼 수 있게 한다
+  // 직접 숨긴 파일이 있으면 알려주고 되돌릴 수 있게 한다
   var hiddenIds = Object.keys(hidden);
   var note = document.getElementById('hiddennote');
   if (hiddenIds.length) {
@@ -682,13 +664,6 @@ function render() {
     undo.textContent = '모두 되돌리기';
     undo.onclick = function () { unhideAll(); render(); };
     note.appendChild(undo);
-    var exp = document.createElement('button');
-    exp.textContent = '삭제 목록으로 내보내기';
-    exp.title = '숨긴 파일들을 to_delete.txt로 저장 - delete_files.py로 넘기면 드라이브 휴지통으로 갑니다';
-    exp.onclick = function () { exportDeleteList(hiddenIds.map(function (id) {
-      return { id: id, filename: hidden[id].filename };
-    })); };
-    note.appendChild(exp);
   } else {
     note.style.display = 'none';
   }
@@ -766,13 +741,11 @@ function render() {
       var exams = byCat[cName][sName];
       var keys = Object.keys(exams);
 
-      // 연도 내림차순 → 학기 → 중간/기말
+      // 최근에 본 시험이 위로 (연도 내림차순 → 그 해 안에서도 나중에 본 것부터)
       keys.sort(function (a, b) {
         var A = a.split('|'), B = b.split('|');
         if (A[1] !== B[1]) return (B[1] || '').localeCompare(A[1] || '');
-        if (A[2] !== B[2]) return (A[2] || '').localeCompare(B[2] || '');
-        var rank = function (t) { return t && t.indexOf('중간') >= 0 ? 0 : 1; };
-        return rank(A[3]) - rank(B[3]);
+        return examOrder(B[2], B[3]) - examOrder(A[2], A[3]);
       });
 
       var fileCount = 0;
@@ -966,14 +939,6 @@ document.getElementById('clearSelBtn').addEventListener('click', function () {
   render();
 });
 
-// 선택한 파일들의 "드라이브 파일ID + 파일명"을 텍스트로 저장한다.
-// 이 페이지는 읽기 전용이라 여기서 직접 지우지 않는다 - 저장된 목록을
-// delete_files.py에 넘기면 확인 절차를 거쳐 드라이브 휴지통으로 옮긴다.
-document.getElementById('deleteListBtn').addEventListener('click', function () {
-  var ids = Object.keys(state.selected);
-  if (!ids.length) return;
-  exportDeleteList(ids.map(function (id) { return state.selected[id]; }));
-});
 document.getElementById('downloadBtn').addEventListener('click', function () {
   var ids = Object.keys(state.selected);
   if (!ids.length) return;
