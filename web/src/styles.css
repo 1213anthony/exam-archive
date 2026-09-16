@@ -97,7 +97,10 @@ a { color: inherit; }
 .btn.sm { height: 30px; padding: 0 10px; border-radius: 9px; font-size: 12.5px; }
 .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 12px; }
 .seg .btn { height: 34px; border: 0; background: transparent; border-radius: 9px; }
-.seg .btn.on { box-shadow: none; }
+.seg .btn.on {
+  /* .seg .btn 이 배경을 투명으로 덮어써서 켜진 쪽이 안 보이던 것을 바로잡음 */
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0b0d1a; box-shadow: none;
+}
 .status { font-size: 12px; color: var(--ink-soft); }
 .crumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-mid); }
 .crumbs button { background: none; border: 0; cursor: pointer; color: var(--ink-mid); padding: 4px 6px; border-radius: 6px; }
@@ -246,9 +249,12 @@ a.doc.a:hover { background: color-mix(in srgb, var(--c, var(--accent)) 15%, tran
 .log { margin-top: 10px; max-height: 140px; overflow: auto; font: 11.5px ui-monospace, monospace; color: var(--ink-mid); }
 
 @media (max-width: 720px) {
-  .hud { padding: 10px 12px 8px; }
+  /* 폰에서는 HUD 높이가 들쭉날쭉(칩이 여러 줄로 감김)이라 고정하지 않고 위에 흘려둔다 */
+  body { overflow: auto; }
+  .hud { position: relative; z-index: 20; padding: 10px 12px 8px; }
   .brand { font-size: 18px; }
-  .list-wrap { padding-top: 230px; }
+  .list-wrap { position: relative; z-index: 10; inset: auto; padding: 8px 12px 120px; overflow: visible; }
+  .panel { position: fixed; top: 12px; }
   .exam { flex-direction: column; align-items: flex-start; gap: 8px; }
   .btns { flex-wrap: wrap; }
   .panel { top: 120px; right: 8px; left: 8px; width: auto; }

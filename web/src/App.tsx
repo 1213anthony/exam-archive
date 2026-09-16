@@ -39,6 +39,8 @@ export default function App() {
   return (
     <>
       <div className="bg-space" />
+      {/* HUD를 먼저 둔다 - 폰에서는 고정이 아니라 흐르기 때문에 DOM 순서가 곧 화면 순서다 */}
+      <Hud />
       {mode === '3d' ? (
         <Suspense fallback={<Loading text="은하를 만드는 중…" />}>
           <Galaxy />
@@ -47,7 +49,6 @@ export default function App() {
       ) : (
         <ClassicList />
       )}
-      <Hud />
       <SelectionBar />
       <Suspense fallback={null}><AdminGate /></Suspense>
     </>
