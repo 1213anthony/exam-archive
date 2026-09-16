@@ -203,7 +203,8 @@ a.doc.a:hover { background: color-mix(in srgb, var(--c, var(--accent)) 15%, tran
 
 /* ---- 3D 라벨 ---- */
 .label {
-  pointer-events: auto; white-space: nowrap; transform: translate(-50%, 0);
+  /* drei <Html center> 가 이미 가운데를 잡아주므로 여기서 또 옮기면 반 칸 밀린다 */
+  pointer-events: auto; white-space: nowrap; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
 .label button {
@@ -215,6 +216,7 @@ a.doc.a:hover { background: color-mix(in srgb, var(--c, var(--accent)) 15%, tran
 .label button:hover, .label button:focus-visible { outline: 0; border-color: var(--c); background: rgba(5,6,13,.55); }
 .label small { font-size: 11px; color: var(--ink-mid); text-shadow: 0 0 8px #000; }
 .label.dim { opacity: .28; }
+.label.lit button { border-color: var(--c); background: rgba(5,6,13,.55); }
 .label.card button { font-size: 13.5px; }
 
 /* ---- 로딩 ---- */

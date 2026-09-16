@@ -39,6 +39,7 @@ export function Hud() {
         if (typing && q) { setQuery(''); return; }
         const st = useStore.getState();
         if (st.subject) goSubject(st.category, null);
+        else if (st.mode === '3d' && st.favOnly) st.setFavOnly(false);   // 성운에서 은하로
         else if (st.category) goCategory(null);
       }
     };
@@ -86,11 +87,14 @@ export function Hud() {
         </div>
       ) : (
         <div className="crumbs">
-          <button onClick={() => goCategory(null)}>은하</button>
-          {category && <><span className="sep">›</span>
+          <button onClick={() => { if (favOnly) useStore.getState().setFavOnly(false); else goCategory(null); }}>은하</button>
+          {favOnly && <><span className="sep">›</span>
+            <button onClick={() => goSubject(null, null)} style={{ color: '#fde68a' }}>★ 즐겨찾기 성운</button></>}
+          {category && !favOnly && <><span className="sep">›</span>
             <button onClick={() => goSubject(category, null)} style={{ color: colorOf(category).glow }}>{category}</button></>}
           {subject && <><span className="sep">›</span><span className="here">{subject}</span></>}
-          {!category && <span className="status" style={{ marginLeft: 8 }}>행성을 클릭해 들어가세요 · 휠 버튼 드래그로 회전 · Esc 로 나오기 · / 검색</span>}
+          {!category && !favOnly && <span className="status" style={{ marginLeft: 8 }}>행성을 클릭해 들어가세요 · 휠 버튼 드래그로 회전 · Esc 로 나오기 · / 검색</span>}
+          {favOnly && !subject && <span className="status" style={{ marginLeft: 8 }}>즐겨찾기한 과목만 모여 있는 곳 · Esc 로 은하로</span>}
         </div>
       )}
 

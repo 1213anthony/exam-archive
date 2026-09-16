@@ -62,6 +62,7 @@ interface State {
   goCategory(c: string | null): void;
   goSubject(c: string | null, s: string | null): void;
   toggleFavOnly(): void;
+  setFavOnly(v: boolean): void;
   toggleFlagOnly(): void;
   toggleFavorite(c: string, s: string): void;
   isFavorite(c: string, s: string): boolean;
@@ -81,7 +82,9 @@ export const useStore = create<State>((set, get) => ({
   q: '',
   category: null,
   subject: null,
-  favOnly: loadBool(KEYS.favOnly, true),
+  // 처음 온 사람(즐겨찾기가 하나도 없음)은 은하부터 보고, 즐겨찾기를 만든 뒤에는 예전처럼
+  // 즐겨찾기만이 기본이 된다. 사용자가 토글한 값은 그대로 기억한다.
+  favOnly: loadBool(KEYS.favOnly, Object.keys(loadMap(KEYS.favorites)).length > 0),
   flagOnly: false,
   favorites: loadMap<1>(KEYS.favorites),
   reviewed: loadMap<1>(KEYS.reviewed),
@@ -95,10 +98,12 @@ export const useStore = create<State>((set, get) => ({
   setQuery: (q) => set({ q }),
   goCategory: (category) => set({ category, subject: null }),
   goSubject: (category, subject) => set({ category, subject }),
-  toggleFavOnly: () => {
-    const v = !get().favOnly;
+  toggleFavOnly: () => get().setFavOnly(!get().favOnly),
+  setFavOnly: (v) => {
     try { localStorage.setItem(KEYS.favOnly, v ? '1' : '0'); } catch { /* */ }
-    set({ favOnly: v, flagOnly: v ? false : get().flagOnly });
+    // 3D에서는 성운을 오가는 이동이라 열어둔 행성·과목은 닫는다 (목록 모드의 분류 탭은 그대로)
+    const nav = get().mode === '3d' ? { category: null, subject: null } : {};
+    set({ favOnly: v, flagOnly: v ? false : get().flagOnly, ...nav });
   },
   toggleFlagOnly: () => {
     const v = !get().flagOnly;

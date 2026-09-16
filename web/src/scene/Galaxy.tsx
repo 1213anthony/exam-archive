@@ -4,9 +4,10 @@ import { Html, Stars, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore, favKey } from '../store';
 import { colorOf } from '../theme/palette';
-import type { Category } from '../lib/archive';
+import type { Subject } from '../lib/archive';
 import { useFullTree, useFilteredTree } from '../ui/trees';
-import { planetSpots, cardSpots, categoryCam, subjectCam, GALAXY_CAM, ORIGIN, type PlanetSpot, type CardSpot } from './layout';
+import { planetSpots, cardSpots, categoryCam, subjectCam, nebulaCards, nebulaCam, nebulaSubjectCam, nebulaFrame,
+  GALAXY_CAM, ORIGIN, NEBULA_POS, type PlanetSpot, type CardSpot, type NebulaCard } from './layout';
 
 // ---------- 공용: 빛무리 스프라이트용 텍스처 (한 번만 만든다) ----------
 let haloTex: THREE.Texture | null = null;
@@ -111,7 +112,7 @@ function CameraRig({ target, look }: { target: THREE.Vector3; look: THREE.Vector
   }, [gl]);
 
   useFrame((_, dt) => {
-    const k = 1 - Math.exp(-dt * 2.4);            // 프레임에 안 흔들리는 감쇠
+    const k = 1 - Math.exp(-dt * 3.2);            // 프레임에 안 흔들리는 감쇠
     const ko = 1 - Math.exp(-dt * 8);
     orbitNow.current.yaw += (orbit.current.yaw - orbitNow.current.yaw) * ko;
     orbitNow.current.pitch += (orbit.current.pitch - orbitNow.current.pitch) * ko;
@@ -226,39 +227,61 @@ function SubjectCard({ card, category, lit, dim, selected, onOpen, fav }: {
 }
 
 // ---------- 즐겨찾기 위성 (은하 화면에서 카메라 가까이) ----------
-function FavoriteSatellites({ tree, onOpen }: { tree: Category[]; onOpen: (c: string, s: string) => void }) {
-  const favorites = useStore((s) => s.favorites);
-  const items = useMemo(() => {
-    const out: { c: string; s: string; n: number }[] = [];
-    for (const c of tree) for (const s of c.subjects) if (favorites[favKey(c.name, s.name)]) out.push({ c: c.name, s: s.name, n: s.exams.length });
-    return out;
-  }, [tree, favorites]);
+// 은하에서 멀리 떨어진 곳에 있는 즐겨찾기 성운. 은하 화면에서는 저 멀리 금빛으로만
+// 보이고(클릭하면 날아감), "즐겨찾기만"을 켜면 카메라가 거기로 가서 즐겨찾기한 과목이
+// 카드 격자로 펼쳐진다. 카드 색은 각자 원래 분류의 색.
+function Nebula({ cards, open, subject, lit, dim, onEnter, onOpen }: {
+  cards: NebulaCard[]; open: boolean; subject: string | null;
+  lit: (c: string, s: string) => boolean; dim: (c: string, s: string) => boolean;
+  onEnter: () => void; onOpen: (c: string, s: string) => void;
+}) {
   const g = useRef<THREE.Group>(null);
-  useFrame((_, dt) => { if (g.current) g.current.rotation.y += dt * 0.06; });
-  if (!items.length) return null;
-  const m = items.length;
+  const [hover, setHover] = useState(false);
+  useFrame((_, dt) => { if (g.current) g.current.rotation.y += dt * 0.05; });
+  const gold = '#fbbf24';
+  // 카드 격자가 놓이는 자리(성운 기준 좌표) - 빈 안내문도 거기에 둔다
+  const gridLocal = useMemo(() => nebulaFrame().out.multiplyScalar(9), []);
   return (
-    <group ref={g} position={[0, 1.5, 12]}>
-      {items.map((it, j) => {
-        const a = (j / m) * Math.PI * 2, r = 4.5 + Math.min(4, m * 0.25);
-        const col = colorOf(it.c);
-        return (
-          <group key={it.c + it.s} position={[Math.cos(a) * r, Math.sin(a * 3) * 0.5, Math.sin(a) * r * 0.5]}>
-            <mesh onClick={(e) => { e.stopPropagation(); onOpen(it.c, it.s); }}
-              onPointerOver={() => { document.body.style.cursor = 'pointer'; }} onPointerOut={() => { document.body.style.cursor = ''; }}>
-              <sphereGeometry args={[0.32, 16, 16]} />
-              <meshStandardMaterial color={col.deep} emissive={col.main} emissiveIntensity={1.6} />
-            </mesh>
-            <Halo color="#fbbf24" scale={1.8} opacity={0.8} />
-            <Html position={[0, -0.7, 0]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
-              <div className="label card" style={{ ['--c' as string]: col.main }}>
-                <button onClick={() => onOpen(it.c, it.s)} aria-label={`즐겨찾기 ${it.s} 열기`}>★ {it.s}</button>
-                <small>{it.c} · {it.n}개 시험</small>
-              </div>
-            </Html>
-          </group>
-        );
-      })}
+    <group position={NEBULA_POS}>
+      {/* 성운 본체: 금빛 구름 몇 겹 + 작은 별. 안개를 안 받게 해서 멀리서도 보인다 */}
+      <group ref={g}>
+        {[[0, 0, 0, 26], [6, 3, -4, 16], [-7, -2, 5, 18], [3, -5, 2, 12]].map(([x, y, z, sc], i) => (
+          <sprite key={i} position={[x, y, z]} scale={[sc, sc, 1]}>
+            <spriteMaterial map={getHalo()} color={i % 2 ? '#f59e0b' : gold} transparent opacity={open ? 0.25 : 0.55}
+              blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
+          </sprite>
+        ))}
+        <mesh onClick={(e) => { e.stopPropagation(); if (!open) onEnter(); }}
+          onPointerOver={() => { if (!open) { setHover(true); document.body.style.cursor = 'pointer'; } }}
+          onPointerOut={() => { setHover(false); document.body.style.cursor = ''; }}>
+          <sphereGeometry args={[2.2, 24, 24]} />
+          {/* 안에 들어가면 가운데 카드 뒤로 비쳐서 거슬리므로 핵은 숨긴다 */}
+          <meshBasicMaterial color="#fff7d6" fog={false} transparent opacity={open ? 0 : 1} />
+        </mesh>
+      </group>
+      {!open && (
+        <Html position={[0, -4.2, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: 'none' }}>
+          <div className={'label' + (hover ? ' lit' : '')} style={{ ['--c' as string]: gold }}>
+            <button onClick={onEnter} aria-label="즐겨찾기 성운으로 이동">★ 즐겨찾기 성운</button>
+            <small>{cards.length ? `${cards.length}개 과목` : '아직 비어 있음'}</small>
+          </div>
+        </Html>
+      )}
+      {open && cards.length === 0 && (
+        <Html position={gridLocal} center zIndexRange={[5, 0]} style={{ pointerEvents: 'none' }}>
+          <div className="label" style={{ ['--c' as string]: gold }}>
+            <button tabIndex={-1}>즐겨찾기한 과목이 없습니다</button>
+            <small>과목 카드나 패널의 ☆를 누르면 여기에 모입니다</small>
+          </div>
+        </Html>
+      )}
+      {open && cards.map((c) => (
+        <group key={c.category + c.subj.name} position={c.pos.clone().sub(NEBULA_POS)}>
+          <SubjectCard card={{ subj: c.subj, pos: new THREE.Vector3(0, 0, 0) }} category={c.category}
+            selected={c.subj.name === subject} lit={lit(c.category, c.subj.name)} dim={dim(c.category, c.subj.name)}
+            fav onOpen={() => onOpen(c.category, c.subj.name)} />
+        </group>
+      ))}
     </group>
   );
 }
@@ -272,11 +295,22 @@ function Scene() {
   const goCategory = useStore((s) => s.goCategory);
   const goSubject = useStore((s) => s.goSubject);
   const favorites = useStore((s) => s.favorites);
+  const favOnly = useStore((s) => s.favOnly);
+  const setFavOnly = useStore((s) => s.setFavOnly);
 
   const spots = useMemo(() => planetSpots(full), [full]);
-  const spot = spots.find((p) => p.cat.name === category) || null;
+  // 성운에 있는 동안은 행성 안으로 들어가지 않는다 (category는 어느 과목인지 알려주는 용도)
+  const spot = (!favOnly && spots.find((p) => p.cat.name === category)) || null;
   const cards = useMemo(() => (spot ? cardSpots(spot) : []), [spot]);
   const card = cards.find((c) => c.subj.name === subject) || null;
+
+  const favItems = useMemo(() => {
+    const out: { category: string; subj: Subject }[] = [];
+    for (const c of full) for (const sub of c.subjects) if (favorites[favKey(c.name, sub.name)]) out.push({ category: c.name, subj: sub });
+    return out;
+  }, [full, favorites]);
+  const nebCards = useMemo(() => nebulaCards(favItems), [favItems]);
+  const nebCard = favOnly ? nebCards.find((c) => c.category === category && c.subj.name === subject) || null : null;
 
   // 검색·정리필요가 켜져 있을 때 "불 켜진" 것들
   const litCats = useMemo(() => new Set(filtered.map((c) => c.name)), [filtered]);
@@ -287,10 +321,14 @@ function Scene() {
   }, [filtered]);
 
   const cam = useMemo(() => {
+    if (favOnly) return nebCard ? nebulaSubjectCam(nebCard) : nebulaCam(nebCards.length);
     if (spot && card) return subjectCam(spot, card);
     if (spot) return categoryCam(spot);
     return { pos: GALAXY_CAM, look: ORIGIN };
-  }, [spot, card]);
+  }, [favOnly, nebCard, nebCards.length, spot, card]);
+
+  const litSub = (c: string, sName: string) => active && litSubs.has(favKey(c, sName));
+  const dimSub = (c: string, sName: string) => active && !litSubs.has(favKey(c, sName));
 
   const lowPower = useMemo(() =>
     (navigator.hardwareConcurrency ? navigator.hardwareConcurrency <= 4 : false)
@@ -299,20 +337,21 @@ function Scene() {
   return (
     <>
       <color attach="background" args={['#05060d']} />
-      <fog attach="fog" args={['#05060d', 45, 110]} />
+      <fog attach="fog" args={['#05060d', 45, 150]} />
       <ambientLight intensity={0.35} />
       <pointLight position={[0, 6, 0]} intensity={90} color="#c7d2fe" distance={80} decay={1.6} />
       <pointLight position={[30, 20, 30]} intensity={40} color="#a5f3fc" distance={120} decay={1.8} />
       <Stars radius={90} depth={40} count={lowPower ? 1500 : 4000} factor={3} saturation={0.4} fade speed={0.4} />
       <Particles count={lowPower ? 600 : 1600} />
       {/* 중심의 태양 — 행성 안에 들어가면 뒤에서 거슬리지 않게 줄인다 */}
-      <group scale={category ? 0.35 : 1}>
+      <group scale={category || favOnly ? 0.35 : 1}>
         <mesh><sphereGeometry args={[1.3, 32, 32]} /><meshBasicMaterial color="#e0e7ff" /></mesh>
-        <Halo color="#a5b4fc" scale={14} opacity={category ? 0.3 : 0.75} />
+        <Halo color="#a5b4fc" scale={14} opacity={category || favOnly ? 0.3 : 0.75} />
       </group>
       {spots.map((p) => (
-        <Planet key={p.cat.name} spot={p} selected={p.cat.name === category} showLabel={!category}
-          lit={active && litCats.has(p.cat.name)} dim={(active && !litCats.has(p.cat.name)) || (!!category && p.cat.name !== category)}
+        <Planet key={p.cat.name} spot={p} selected={!favOnly && p.cat.name === category} showLabel={!category && !favOnly}
+          lit={!favOnly && active && litCats.has(p.cat.name)}
+          dim={favOnly || (active && !litCats.has(p.cat.name)) || (!!category && p.cat.name !== category)}
           onOpen={() => goCategory(p.cat.name)} />
       ))}
       {spot && cards.map((c) => (
@@ -322,7 +361,9 @@ function Scene() {
           fav={!!favorites[favKey(spot.cat.name, c.subj.name)]}
           onOpen={() => goSubject(spot.cat.name, c.subj.name)} />
       ))}
-      {!category && <FavoriteSatellites tree={full} onOpen={(c, s) => goSubject(c, s)} />}
+      <Nebula cards={nebCards} open={favOnly} subject={favOnly ? subject : null} lit={litSub} dim={dimSub}
+        onEnter={() => { goCategory(null); setFavOnly(true); }}
+        onOpen={(c, sName) => goSubject(c, sName)} />
       <CameraRig target={cam.pos} look={cam.look} />
     </>
   );
@@ -344,6 +385,7 @@ export function Galaxy() {
           if (t && t.closest && t.closest('.label')) return;
           const st = useStore.getState();
           if (st.subject) goSubject(st.category, null);
+          else if (st.favOnly) st.setFavOnly(false);
           else if (st.category) goCategory(null);
         }}>
         <Scene />
