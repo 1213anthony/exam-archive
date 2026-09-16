@@ -90,7 +90,7 @@ export function Hud() {
           {category && <><span className="sep">›</span>
             <button onClick={() => goSubject(category, null)} style={{ color: colorOf(category).glow }}>{category}</button></>}
           {subject && <><span className="sep">›</span><span className="here">{subject}</span></>}
-          {!category && <span className="status" style={{ marginLeft: 8 }}>행성을 클릭해 들어가세요 · Esc 로 나오기 · / 검색</span>}
+          {!category && <span className="status" style={{ marginLeft: 8 }}>행성을 클릭해 들어가세요 · 휠 버튼 드래그로 회전 · Esc 로 나오기 · / 검색</span>}
         </div>
       )}
 

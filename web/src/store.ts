@@ -25,17 +25,14 @@ export type Mode = '3d' | 'list';
 
 export function favKey(category: string, subject: string) { return category + '||' + subject; }
 
-// 폰·저사양·움직임 줄이기 설정에서는 3D를 켜지 않는다
+// 기본은 어디서나 3D. 사용자가 목록으로 바꾸면 그 선택을 기억한다.
+// (폰에서는 입자·별 개수만 줄여서 돌린다 - Galaxy의 lowPower 참고)
 export function detectDefaultMode(): Mode {
   try {
     const saved = localStorage.getItem(KEYS.mode);
     if (saved === '3d' || saved === 'list') return saved;
   } catch { /* ignore */ }
-  if (typeof window === 'undefined') return 'list';
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const narrow = window.innerWidth < 900;
-  return coarse || reduce || narrow ? 'list' : '3d';
+  return '3d';
 }
 
 interface State {

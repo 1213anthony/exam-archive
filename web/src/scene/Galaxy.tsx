@@ -60,14 +60,72 @@ function Particles({ count }: { count: number }) {
 }
 
 // ---------- 카메라 ----------
+// 마우스 가운데 버튼(휠)을 누른 채 끌면 지금 보고 있는 지점을 중심으로 카메라가 돈다.
+// 다른 곳으로 날아가면(행성 들어가기 등) 돌려둔 각도는 0으로 되돌린다.
 function CameraRig({ target, look }: { target: THREE.Vector3; look: THREE.Vector3 }) {
-  const { camera, pointer } = useThree();
+  const { camera, pointer, gl } = useThree();
   const curLook = useRef(look.clone());
+  const orbit = useRef({ yaw: 0, pitch: 0 });          // 목표 각도
+  const orbitNow = useRef({ yaw: 0, pitch: 0 });       // 감쇠된 현재 각도
+  const drag = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => { orbit.current = { yaw: 0, pitch: 0 }; }, [target]);
+
+  useEffect(() => {
+    const el = gl.domElement;
+    const down = (e: PointerEvent) => {
+      if (e.button !== 1) return;
+      e.preventDefault();                               // 윈도우의 휠 클릭 자동 스크롤 막기
+      drag.current = { x: e.clientX, y: e.clientY };
+      el.setPointerCapture(e.pointerId);
+      document.body.style.cursor = 'grabbing';
+    };
+    const move = (e: PointerEvent) => {
+      if (!drag.current) return;
+      const dx = e.clientX - drag.current.x, dy = e.clientY - drag.current.y;
+      drag.current = { x: e.clientX, y: e.clientY };
+      orbit.current.yaw -= dx * 0.005;
+      orbit.current.pitch = THREE.MathUtils.clamp(orbit.current.pitch - dy * 0.004, -0.9, 0.9);
+    };
+    const up = (e: PointerEvent) => {
+      if (!drag.current) return;
+      drag.current = null;
+      try { el.releasePointerCapture(e.pointerId); } catch { /* 이미 풀림 */ }
+      document.body.style.cursor = '';
+    };
+    const block = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('mousedown', block);            // auxclick 자동 스크롤 차단
+    el.addEventListener('auxclick', block);
+    return () => {
+      el.removeEventListener('pointerdown', down);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      el.removeEventListener('mousedown', block);
+      el.removeEventListener('auxclick', block);
+    };
+  }, [gl]);
+
   useFrame((_, dt) => {
     const k = 1 - Math.exp(-dt * 2.4);            // 프레임에 안 흔들리는 감쇠
-    // 마우스 시차: 갤럭시에서는 크게, 안으로 들어갈수록 작게
-    const par = 1.2;
-    const goal = target.clone().add(new THREE.Vector3(pointer.x * par, pointer.y * par * 0.6, 0));
+    const ko = 1 - Math.exp(-dt * 8);
+    orbitNow.current.yaw += (orbit.current.yaw - orbitNow.current.yaw) * ko;
+    orbitNow.current.pitch += (orbit.current.pitch - orbitNow.current.pitch) * ko;
+
+    // 시선점을 중심으로 목표 자리를 회전시킨다 (yaw: 수직축, pitch: 가로축)
+    const off = target.clone().sub(look);
+    const sph = new THREE.Spherical().setFromVector3(off);
+    sph.theta += orbitNow.current.yaw;
+    sph.phi = THREE.MathUtils.clamp(sph.phi + orbitNow.current.pitch, 0.15, Math.PI - 0.15);
+    const rotated = new THREE.Vector3().setFromSpherical(sph).add(look);
+
+    // 마우스 시차 (드래그 중에는 끈다)
+    const par = drag.current ? 0 : 1.2;
+    const goal = rotated.add(new THREE.Vector3(pointer.x * par, pointer.y * par * 0.6, 0));
     camera.position.lerp(goal, k);
     curLook.current.lerp(look, k);
     camera.lookAt(curLook.current);
@@ -234,7 +292,9 @@ function Scene() {
     return { pos: GALAXY_CAM, look: ORIGIN };
   }, [spot, card]);
 
-  const lowPower = useMemo(() => navigator.hardwareConcurrency ? navigator.hardwareConcurrency <= 4 : false, []);
+  const lowPower = useMemo(() =>
+    (navigator.hardwareConcurrency ? navigator.hardwareConcurrency <= 4 : false)
+    || window.matchMedia('(pointer: coarse)').matches, []);
 
   return (
     <>
