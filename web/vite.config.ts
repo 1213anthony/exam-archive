@@ -31,13 +31,9 @@ export default defineConfig({
     // Pages로 서빙)을 그대로 쓰기 위해서다. 루트의 다른 파일은 건드리지 않는다.
     outDir: path.resolve(__dirname, '..'),
     emptyOutDir: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          three: ['three', '@react-three/fiber', '@react-three/drei'],
-        },
-      },
-    },
+    // three.js는 Galaxy를 lazy import 할 때만 같이 내려오게 둔다(수동 청크로 떼면
+    // 진입 HTML에 modulepreload가 붙어 목록 모드 사용자도 1MB를 받게 된다).
+    chunkSizeWarningLimit: 1200,
   },
   test: {
     environment: 'node',

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Category, Subject } from '../lib/archive';
 
 // 3D 공간에서 행성·카드가 놓이는 자리. 한 곳에서 계산해 카메라와 렌더가 같은 값을 쓴다.
-export const GALAXY_CAM = new THREE.Vector3(0, 24, 52);
+export const GALAXY_CAM = new THREE.Vector3(0, 40, 50);
 export const ORIGIN = new THREE.Vector3(0, 0, 0);
 
 export interface PlanetSpot { cat: Category; pos: THREE.Vector3; radius: number; hue: number }
@@ -14,8 +14,8 @@ export function planetSpots(tree: Category[]): PlanetSpot[] {
     // 서로의 사이에 오게 한다. 라벨이 겹치지 않을 만큼 벌린다.
     const outer = i % 2 === 1;
     const a = (i / n) * Math.PI * 2 - Math.PI / 2 + (outer ? Math.PI / n : 0);
-    const ring = outer ? 27 : 16;
-    const pos = new THREE.Vector3(Math.cos(a) * ring, Math.sin(a * 2) * 2.2 + (outer ? 1.5 : -1), Math.sin(a) * ring * 0.8);
+    const ring = outer ? 30 : 17.5;
+    const pos = new THREE.Vector3(Math.cos(a) * ring, Math.sin(a * 2) * 2.6 + (outer ? 2.2 : -1.6), Math.sin(a) * ring * 0.8);
     const radius = 0.9 + Math.sqrt(cat.examCount) / 9;   // 시험 수에 비례 (1.1 ~ 2.9)
     return { cat, pos, radius, hue: i / n };
   });
