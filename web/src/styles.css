@@ -39,15 +39,14 @@ a { color: inherit; }
     var(--bg);
 }
 .bg-space::after {
-  content: ""; position: absolute; inset: 0; opacity: .5;
+  /* 목록 모드에서 글자 위로 겹쳐 지저분해 보이지 않게 아주 옅게만 쓴다 */
+  content: ""; position: absolute; inset: 0; opacity: .22;
   background-image:
     radial-gradient(1px 1px at 20% 30%, #fff 50%, transparent 51%),
     radial-gradient(1px 1px at 70% 60%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 40% 80%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 85% 15%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 10% 70%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 60% 25%, #fff 50%, transparent 51%);
-  background-size: 700px 500px; animation: drift 80s linear infinite;
+    radial-gradient(1px 1px at 40% 80%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 85% 15%, #fff 50%, transparent 51%);
+  background-size: 900px 700px; animation: drift 120s linear infinite;
 }
 @keyframes drift { to { background-position: 700px 500px; } }
 
@@ -63,7 +62,7 @@ a { color: inherit; }
 .hud > * { pointer-events: auto; }
 .hud-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .brand {
-  font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -.01em;
+  font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: -.01em;
   display: flex; align-items: baseline; gap: 10px; white-space: nowrap;
   text-shadow: 0 0 24px rgba(124, 156, 255, .35);
 }
@@ -131,7 +130,7 @@ details.cat > summary {
 details.cat > summary::-webkit-details-marker { display: none; }
 details.cat > summary::before { content: "▾"; color: var(--ink-soft); font-size: 12px; }
 details.cat:not([open]) > summary::before { content: "▸"; }
-.cat-name { font-family: var(--serif); font-size: 19px; font-weight: 600; }
+.cat-name { font-family: var(--serif); font-size: 19px; font-weight: 700; }
 .cat-meta { font-size: 12px; color: var(--ink-soft); }
 details.subj { margin: 8px 0 0 14px; }
 details.subj > summary {
@@ -157,7 +156,7 @@ details.subj[open] > summary::before { content: "▾"; }
 .exam.clustered { align-items: flex-start; }
 .exam-label { flex: 1; min-width: 0; }
 .exam-when { font-size: 14.5px; }
-.exam-when .yr { font-family: var(--serif); font-weight: 600; margin-right: 6px; }
+.exam-when .yr { font-family: var(--serif); font-weight: 700; margin-right: 6px; }
 .exam-files { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; word-break: break-all; }
 .flag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; margin-left: 8px;
   background: rgba(255,255,255,.07); color: var(--ink-soft); vertical-align: 1px; }
