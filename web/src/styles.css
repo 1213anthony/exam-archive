@@ -199,6 +199,7 @@ a.doc.a:hover { background: color-mix(in srgb, var(--c, var(--accent)) 15%, tran
 .selbar {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 30;
   display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  flex-wrap: wrap; justify-content: center; max-width: min(92vw, 640px);
 }
 
 /* ---- 3D 라벨 ---- */
@@ -237,7 +238,8 @@ a.doc.a:hover { background: color-mix(in srgb, var(--c, var(--accent)) 15%, tran
 .adminbox { position: fixed; right: 18px; bottom: 70px; z-index: 31; width: 340px; padding: 14px 16px; font-size: 13px; }
 .adminbox h3 { margin: 0 0 8px; font-size: 14px; }
 .adminbox .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-.adminbox .muted { color: var(--ink-soft); }
+.muted { color: var(--ink-soft); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
 .trash { margin-left: 4px; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
 .trash:hover { color: var(--danger); background: rgba(251,113,133,.12); }
 .trash:disabled { opacity: .35; cursor: not-allowed; }

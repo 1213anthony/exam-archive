@@ -2,24 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useAdmin, ALLOWED_ADMINS, CLIENT_ID } from './adminStore';
 import { trash, untrash, whoAmI } from './drive';
-
-declare global {
-  interface Window { google?: any }
-}
-
-// Google Identity Services는 구글이 배포하는 스크립트라 번들에 넣을 수 없다.
-// 로그인 버튼을 눌렀을 때만 읽어온다.
-function loadGis(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.google?.accounts?.oauth2) { resolve(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('구글 로그인 스크립트를 못 불러옴'));
-    document.head.appendChild(s);
-  });
-}
+import { loadGis } from '../lib/gis';
 
 const SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email';
 
