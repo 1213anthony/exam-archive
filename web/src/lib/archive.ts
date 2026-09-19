@@ -32,9 +32,6 @@ export function catRank(c: string): number {
 export function viewUrl(r: Rec): string {
   return `https://drive.google.com/file/d/${r.id}/view`;
 }
-export function downloadUrl(id: string): string {
-  return `https://drive.google.com/uc?export=download&id=${id}`;
-}
 
 // ---- 문서유형 ----
 export function isProblem(dt?: string): boolean {

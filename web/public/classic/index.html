@@ -229,7 +229,7 @@
 
 <div class="selectbar" id="selectbar" style="display:none;">
   <span id="selcount"></span>
-  <button id="downloadBtn">선택한 파일 다운로드</button>
+  <button id="downloadBtn" title="각 파일을 드라이브 보기 화면으로 새 탭에 엽니다">선택한 파일 열기</button>
   <button id="clearSelBtn">선택 해제</button>
 </div>
 
@@ -311,8 +311,6 @@ function unhideAll() { hidden = {}; saveMap(HIDDEN_KEY, hidden); }
 var state = { cat: null, q: '', flagOnly: false, favOnly: loadFavOnly(), selected: {} };
 
 // ---- 선택 다운로드 ----
-// 드라이브 "보기" 링크(.../view) 대신 바로 다운로드되는 링크를 씀
-function downloadUrl(id) { return 'https://drive.google.com/uc?export=download&id=' + id; }
 // data.js에는 용량을 줄이려고 url을 안 싣는다. id로 만들어 쓴다.
 function viewUrl(r) { return r.url || ('https://drive.google.com/file/d/' + r.id + '/view'); }
 function isSelected(r) { return !!state.selected[r.id]; }
@@ -940,20 +938,14 @@ document.getElementById('clearSelBtn').addEventListener('click', function () {
 });
 
 document.getElementById('downloadBtn').addEventListener('click', function () {
-  var ids = Object.keys(state.selected);
-  if (!ids.length) return;
-  // <a target=_blank>를 여러 개 연달아 클릭하면 두 번째부터는 브라우저가
-  // "사용자 조작 없이 새 창을 여는 것"으로 보고 팝업을 막는 경우가 많음.
-  // 숨긴 iframe으로 다운로드 링크를 열면 팝업 취급을 안 받고, 페이지 이동도
-  // 안 일어나서(다운로드 응답이라 네비게이션이 안 됨) 더 안전함.
-  ids.forEach(function (id, i) {
-    setTimeout(function () {
-      var iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = downloadUrl(id);
-      document.body.appendChild(iframe);
-      setTimeout(function () { document.body.removeChild(iframe); }, 15000);
-    }, i * 500);
+  var recs = Object.values(state.selected);
+  if (!recs.length) return;
+  // 예전에는 숨긴 iframe으로 uc?export=download를 불러 조용히 저장했지만,
+  // 구글이 다운로드 전에 로그인/확인 화면을 끼워 넣게 되면서 숨긴 iframe 안에서는
+  // 그 화면이 아예 안 보여 아무 일도 안 일어나는 것처럼 되어버렸다. 그래서 각 파일을
+  // 새 탭(드라이브 보기 화면)으로 열어, 로그인이 필요하면 사용자가 직접 보고 처리하게 한다.
+  recs.forEach(function (r, i) {
+    setTimeout(function () { window.open(viewUrl(r), '_blank', 'noopener'); }, i * 300);
   });
 });
 
