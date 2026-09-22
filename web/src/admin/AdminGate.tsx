@@ -9,7 +9,8 @@ const SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com
 export default function AdminGate() {
   const admin = useStore((s) => s.admin);
   const setAdmin = useStore((s) => s.setAdmin);
-  const [open, setOpen] = useState(false);
+  const open = useAdmin((s) => s.panelOpen);
+  const setOpen = useAdmin((s) => s.setPanelOpen);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const log = useAdmin((s) => s.log);
@@ -72,8 +73,6 @@ export default function AdminGate() {
 
   return (
     <>
-      <button className="lock glass" onClick={() => setOpen((v) => !v)} title={admin ? `관리 모드: ${admin.email}` : '관리자 로그인'}
-        aria-label="관리자">{admin ? '🔓' : '🔒'}</button>
       {open && (
         <div className="adminbox glass">
           {!configured ? (

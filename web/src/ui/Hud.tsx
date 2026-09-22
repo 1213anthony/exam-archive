@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { catRank } from '../lib/archive';
 import { useFilteredTree } from './trees';
 import { colorOf } from '../theme/palette';
+import { useAdmin } from '../admin/adminStore';
 
 export function Hud() {
   const mode = useStore((s) => s.mode);
@@ -21,6 +22,7 @@ export function Hud() {
   const version = useStore((s) => s.version);
   const inputRef = useRef<HTMLInputElement>(null);
   const { tree: hits } = useFilteredTree({ ignoreFavOnly: true });
+  const setAdminPanelOpen = useAdmin((s) => s.setPanelOpen);
 
   const catCounts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -54,8 +56,16 @@ export function Hud() {
           <span style={{ color: 'var(--ink-soft)' }}>⌕</span>
           <input ref={inputRef} value={q} onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              // Enter: 3D 모드에서는 첫 결과 과목으로 바로 날아간다
-              if (e.key === 'Enter' && mode === '3d' && q.trim() && hits.length && hits[0].subjects.length) {
+              if (e.key !== 'Enter') return;
+              // 자물쇠를 없앤 대신, "admin" 입력 후 엔터로 관리자 로그인 패널을 연다
+              if (q.trim().toLowerCase() === 'admin') {
+                setAdminPanelOpen(true);
+                setQuery('');
+                inputRef.current?.blur();
+                return;
+              }
+              // 3D 모드에서는 첫 결과 과목으로 바로 날아간다
+              if (mode === '3d' && q.trim() && hits.length && hits[0].subjects.length) {
                 goSubject(hits[0].name, hits[0].subjects[0].name);
                 inputRef.current?.blur();
               }
