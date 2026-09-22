@@ -1482,7 +1482,11 @@ def parse_record(filename, folder_path, drive_id, layout="분류먼저"):
         if not subject:
             # 폴더에 과목이 없고 파일명에만 있는 경우
             # ("2024_1학기 기말 모범답안 / 05_모범답안및해설_(문학)_2024년1기말.pdf")
-            subject = fname_meta.get("subject_raw")
+            # "분류먼저" 쪽 같은 대체 경로는 apply_subject_alias를 거치는데 여기는
+            # 빠져 있어서, "창융특_분자건축"처럼 파일명에 그대로 적힌 지저분한
+            # 표기가 안 걸러지고 새는 문제가 있었다(예: "창융특" 폴더 하나뿐인
+            # 경로). 여기도 똑같이 걸러야 한다.
+            subject = apply_subject_alias(fname_meta.get("subject_raw"))
     else:
         category = folder_path[0] if len(folder_path) > 0 else None
         # "창융특"은 창의융합특강의 축약 표기라 분류 이름을 정식 명칭으로 통일한다

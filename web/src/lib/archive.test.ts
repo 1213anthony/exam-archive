@@ -19,11 +19,11 @@ function loadData(): Rec[] {
 describe('실제 데이터 회귀', () => {
   const all = loadData();
   const st = countStats(all);
-  it('파일 수', () => expect(st.files).toBe(13538));
+  it('파일 수', () => expect(st.files).toBe(13542));
   it('분류 12개', () => expect(st.categories).toBe(12));
   it('과목 102개', () => expect(st.subjects).toBe(102));
   it('시험 1877줄', () => expect(st.exams).toBe(1877));
-  it('정리 필요 19개', () => expect(st.incomplete).toBe(19));
+  it('정리 필요 15개', () => expect(st.incomplete).toBe(15));
   it('연도 미상 0개', () => expect(st.unknownYear).toBe(0));
 
   it('한 시험 줄에 같은 문서유형은 한 장만', () => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../store';
-import { catRank, countStats } from '../lib/archive';
+import { catRank } from '../lib/archive';
 import { useFilteredTree } from './trees';
 import { colorOf } from '../theme/palette';
 
@@ -22,7 +22,6 @@ export function Hud() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { tree: hits } = useFilteredTree({ ignoreFavOnly: true });
 
-  const stats = useMemo(() => countStats(data), [data]);
   const catCounts = useMemo(() => {
     const m: Record<string, number> = {};
     for (const r of data) { const c = r.category || '(미분류)'; m[c] = (m[c] || 0) + 1; }
@@ -50,7 +49,7 @@ export function Hud() {
   return (
     <div className="hud">
       <div className="hud-row">
-        <div className="brand">기출문제 아카이브 <small>서울과학고</small></div>
+        <div className="brand">기출문제 아카이브 <small>서울과학고{version ? ` · 마지막 업데이트 ${version}` : ''}</small></div>
         <label className="search glass">
           <span style={{ color: 'var(--ink-soft)' }}>⌕</span>
           <input ref={inputRef} value={q} onChange={(e) => setQuery(e.target.value)}
@@ -93,15 +92,9 @@ export function Hud() {
           {category && !favOnly && <><span className="sep">›</span>
             <button onClick={() => goSubject(category, null)} style={{ color: colorOf(category).glow }}>{category}</button></>}
           {subject && <><span className="sep">›</span><span className="here">{subject}</span></>}
-          {!category && !favOnly && <span className="status" style={{ marginLeft: 8 }}>행성을 클릭해 들어가세요 · 휠 버튼 드래그로 회전 · Esc 로 나오기 · / 검색</span>}
           {favOnly && !subject && <span className="status" style={{ marginLeft: 8 }}>즐겨찾기한 과목만 모여 있는 곳 · Esc 로 은하로</span>}
         </div>
       )}
-
-      <div className="status">
-        {stats.exams}개 시험 · 파일 {stats.files}개
-        {version ? ` · 데이터 ${version}` : ''}
-      </div>
     </div>
   );
 }
