@@ -14,6 +14,7 @@ export function Hud() {
   const flagOnly = useStore((s) => s.flagOnly);
   const toggleFavOnly = useStore((s) => s.toggleFavOnly);
   const toggleFlagOnly = useStore((s) => s.toggleFlagOnly);
+  const admin = useStore((s) => s.admin);
   const category = useStore((s) => s.category);
   const subject = useStore((s) => s.subject);
   const goCategory = useStore((s) => s.goCategory);
@@ -29,6 +30,11 @@ export function Hud() {
     for (const r of data) { const c = r.category || '(미분류)'; m[c] = (m[c] || 0) + 1; }
     return Object.keys(m).sort((a, b) => catRank(a) - catRank(b) || a.localeCompare(b, 'ko')).map((c) => [c, m[c]] as const);
   }, [data]);
+
+  // "정리 필요만"은 관리자 전용 - 로그아웃하면 필터도 같이 꺼준다
+  useEffect(() => {
+    if (!admin && flagOnly) toggleFlagOnly();
+  }, [admin, flagOnly, toggleFlagOnly]);
 
   // 단축키: "/" 검색, Esc 뒤로
   useEffect(() => {
@@ -74,7 +80,9 @@ export function Hud() {
           {q ? <button className="btn sm" onClick={() => setQuery('')}>지우기</button> : <kbd>/</kbd>}
         </label>
         <button className={'btn' + (favOnly ? ' on' : '')} onClick={toggleFavOnly} title="★ 표시한 과목만">즐겨찾기만</button>
-        <button className={'btn' + (flagOnly ? ' on' : '')} onClick={toggleFlagOnly} title="문제지나 해설 한쪽이 안 보이는 시험만">정리 필요만</button>
+        {admin && (
+          <button className={'btn' + (flagOnly ? ' on' : '')} onClick={toggleFlagOnly} title="문제지나 해설 한쪽이 안 보이는 시험만">정리 필요만</button>
+        )}
         <div className="seg glass" role="group" aria-label="보기 모드">
           <button className={'btn' + (mode === '3d' ? ' on' : '')} onClick={() => setMode('3d')}>3D</button>
           <button className={'btn' + (mode === 'list' ? ' on' : '')} onClick={() => setMode('list')}>목록</button>
