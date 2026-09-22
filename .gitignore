@@ -10,6 +10,9 @@ delete_log.jsonl
 # ---- 원자료 백업 (사이트엔 data.js만 쓰임) ----
 data.json
 
+# ---- 증분 크롤링 진행 상태 (기기별로 다름) ----
+crawl_state.json
+
 # ---- 기타 ----
 __pycache__/
 *.pyc

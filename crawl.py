@@ -26,6 +26,11 @@
    → 브라우저가 열리고 학교 계정으로 로그인 → 읽기 전용 권한 승인
    → 완료되면 data.json 생성됨 (기존 data.json은 덮어씀)
 4. data.json을 index.html과 같은 폴더에 두고 그대로 GitHub Pages 등에 배포
+
+평소 업데이트: update.bat 더블클릭 (크롤링 → data.js 커밋 → 푸시까지 한 번에).
+crawl_state.json이 있으면 지난 실행 이후 새로 올라온 파일만 확인하는 증분
+모드로 돈다(전체를 다시 훑지 않아서 훨씬 빠름). 삭제/이동/이름바꾸기까지
+반영하려면 가끔 update_full.bat(= python crawl.py --full)로 전체를 다시 훑을 것.
 """
 
 import datetime
@@ -1667,16 +1672,128 @@ def crawl(service, folder_id, folder_path, layout="분류먼저"):
     return records
 
 
+# ---- 증분 크롤링 (새로 올라온 파일만) ---------------------------------------
+# 전체 재귀 크롤링은 폴더 하나하나에 API 요청을 보내야 해서(폴더가 수백 개라
+# 몇 분씩 걸림), 파일이 하나만 새로 올라와도 매번 전체를 다시 훑어야 했다.
+# 증분 모드는 "modifiedTime > 지난 실행 시각"으로 드라이브 전체에서 최근 변경된
+# 파일만 딱 찾아서(요청 한두 번), 그 파일이 어느 폴더 밑에 있는지만 위로
+# 올라가며 확인한다. data.json(직전 결과)에 새 파일만 얹어 합친다.
+# 한계(알고 진행): 삭제/이동/이름바꾸기는 못 잡는다 - 가끔(예: 한 달에 한 번
+# 정도) `python crawl.py --full`로 전체를 다시 훑어서 이런 변화를 반영해야 한다.
+STATE_FILE = "crawl_state.json"
+
+
+def load_state():
+    try:
+        with open(STATE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
+def save_state(since_iso):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"since": since_iso}, f)
+
+
+def find_root_and_path(service, parent_id, root_by_id, cache):
+    """parent_id부터 위로 올라가며 ROOT_FOLDERS 중 하나에 닿는지 찾는다.
+    닿으면 (layout, folder_path)를, 우리 폴더 밖이면 None을 돌려준다.
+    folder_path는 루트 바로 밑부터 파일의 직계 부모까지 폴더 이름 리스트
+    (재귀 크롤링이 만드는 것과 같은 형식)."""
+    names = []
+    current = parent_id
+    depth = 0
+    while current and depth < 12:  # 안전장치: 우리 트리 밖의 깊은 경로에서 멈추지 않게
+        if current in root_by_id:
+            return root_by_id[current], list(reversed(names))
+        if current not in cache:
+            try:
+                meta = service.files().get(fileId=current, fields="id, name, parents").execute()
+            except Exception:
+                return None
+            cache[current] = meta
+        meta = cache[current]
+        names.append(meta["name"])
+        parents = meta.get("parents") or []
+        current = parents[0] if parents else None
+        depth += 1
+    return None
+
+
+def crawl_incremental(service, since_iso):
+    root_by_id = {root_id: layout for _, root_id, layout in ROOT_FOLDERS}
+    query = f"mimeType = 'application/pdf' and trashed = false and modifiedTime > '{since_iso}'"
+    hits = []
+    page_token = None
+    while True:
+        resp = service.files().list(
+            q=query,
+            fields="nextPageToken, files(id, name, parents, modifiedTime, size, md5Checksum)",
+            pageSize=1000,
+            pageToken=page_token,
+        ).execute()
+        hits.extend(resp.get("files", []))
+        page_token = resp.get("nextPageToken")
+        if not page_token:
+            break
+
+    records = []
+    skipped = 0
+    path_cache = {}
+    for f in hits:
+        name = unicodedata.normalize("NFC", f["name"])
+        if name.startswith("._"):
+            continue
+        parents = f.get("parents") or []
+        found = find_root_and_path(service, parents[0], root_by_id, path_cache) if parents else None
+        if not found:
+            skipped += 1
+            continue
+        layout, folder_path = found
+        rec = parse_record(name, folder_path, f["id"], layout)
+        rec["duplicate_sibling_folder"] = False
+        rec["duplicate_folder_id"] = None
+        rec["duplicate_folder_modified"] = None
+        rec["modified_time"] = f.get("modifiedTime")
+        rec["size"] = int(f["size"]) if f.get("size") else None
+        rec["md5"] = f.get("md5Checksum") or MD5_CACHE.get(f["id"])
+        records.append(rec)
+    return records, skipped
+
+
 def main():
+    force_full = "--full" in sys.argv
+    state = None if force_full else load_state()
+    prev_records = None
+    if state:
+        try:
+            with open("data.json", encoding="utf-8") as f:
+                prev_records = json.load(f)
+        except FileNotFoundError:
+            state = None  # 이어붙일 이전 결과가 없으면 전체 크롤링으로 돌아간다
+
     print("드라이브 인증 중... (브라우저 창이 열립니다)")
     service = get_service()
-    print("크롤링 시작... (파일 수에 따라 몇 분 걸릴 수 있음)")
-    records = []
-    for label, root_id, layout in ROOT_FOLDERS:
-        print(f"  [{label}] 훑는 중...")
-        got = crawl(service, root_id, [], layout)
-        print(f"  [{label}] {len(got)}개")
-        records.extend(got)
+    run_started = datetime.datetime.now(datetime.timezone.utc)
+
+    if state and prev_records is not None:
+        since = state["since"]
+        print(f"증분 크롤링: {since} 이후 새로 올라온 파일만 확인합니다...")
+        new_records, skipped = crawl_incremental(service, since)
+        note = f" ({skipped}개는 우리가 보는 폴더 밖이라 건너뜀)" if skipped else ""
+        print(f"  새 파일/변경된 파일 {len(new_records)}개 발견{note}")
+        by_id = {r["id"]: r for r in prev_records}
+        by_id.update({r["id"]: r for r in new_records})
+        records = list(by_id.values())
+    else:
+        print("전체 크롤링 시작... (파일 수에 따라 몇 분 걸릴 수 있음)")
+        records = []
+        for label, root_id, layout in ROOT_FOLDERS:
+            print(f"  [{label}] 훑는 중...")
+            got = crawl(service, root_id, [], layout)
+            print(f"  [{label}] {len(got)}개")
+            records.extend(got)
     filled, unknown = fill_missing_categories(records)
     if filled or unknown:
         print(f"  분류가 없던 기록 {filled}개는 과목 이름으로 채움, {unknown}개는 못 찾음")
@@ -1718,6 +1835,13 @@ def main():
     if duplicated:
         print(f"- {duplicated}개는 형제 폴더가 이름이 같아서 인수인계 중 중복 생성된 폴더로 추정됨 (duplicate_sibling_folder=true)")
         print("  -> 두 폴더 내용을 비교해서 병합/삭제 후보로 검토 추천")
+
+    # 시계 오차·드라이브 색인 반영 지연에 대비해 2분 여유를 두고 저장한다.
+    # 다음 실행은 이 시각 이후로 바뀐 파일만 본다(증분 모드).
+    new_since = (run_started - datetime.timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    save_state(new_since)
+    print(f"\n다음 실행은 증분 모드로 진행됩니다(기준: {new_since} 이후).")
+    print("삭제/이동/이름바꾸기까지 반영하려면 가끔 `python crawl.py --full`로 전체를 다시 훑어주세요.")
 
 
 if __name__ == "__main__":
