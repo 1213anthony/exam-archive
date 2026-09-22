@@ -1,30 +1,29 @@
 @echo off
-chcp 65001 > nul
 setlocal
 cd /d "%~dp0"
 
-echo ===== 기출문제 아카이브 업데이트 (증분) =====
+echo ===== exam-archive update (incremental) =====
 echo.
 
 python crawl.py
 if errorlevel 1 (
     echo.
-    echo [오류] 크롤링이 실패했습니다. 위 메시지를 확인하세요.
+    echo [ERROR] crawl.py failed. Check the messages above.
     pause
     exit /b 1
 )
 
 echo.
-echo ---- 깃에 반영 ----
+echo ---- git ----
 git add data.js
 git diff --cached --quiet
 if errorlevel 1 (
-    git commit -m "data.js 업데이트 (%date% %time%)"
+    git commit -m "update data.js"
     git push
     echo.
-    echo ===== 완료: 사이트에 반영됐습니다 =====
+    echo ===== done: pushed to the site =====
 ) else (
-    echo 바뀐 내용이 없습니다. 배포할 게 없어요.
+    echo Nothing changed - nothing to deploy.
 )
 
 pause
