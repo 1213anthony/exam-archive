@@ -80,7 +80,6 @@ export function ClassicList() {
               onToggle={(e) => { if (!forceOpen) setCatClosed(c.name, !(e.currentTarget as HTMLDetailsElement).open); }}>
               <summary>
                 <span className="cat-name">{c.name}</span>
-                <span className="cat-meta">{c.subjects.length}개 과목 · {c.examCount}개 시험</span>
               </summary>
               {body}
             </details>

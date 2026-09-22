@@ -131,7 +131,6 @@ details.cat > summary::-webkit-details-marker { display: none; }
 details.cat > summary::before { content: "▾"; color: var(--ink-soft); font-size: 12px; }
 details.cat:not([open]) > summary::before { content: "▸"; }
 .cat-name { font-family: var(--serif); font-size: 19px; font-weight: 700; }
-.cat-meta { font-size: 12px; color: var(--ink-soft); }
 details.subj { margin: 8px 0 0 14px; }
 details.subj > summary {
   list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px;

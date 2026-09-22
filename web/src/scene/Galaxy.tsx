@@ -171,7 +171,6 @@ function Planet({ spot, lit, dim, onOpen, selected, showLabel }: {
           <div className={'label' + (dim ? ' dim' : '')} style={{ ['--c' as string]: col.main }}>
             <button onClick={onOpen} onFocus={() => setHover(true)} onBlur={() => setHover(false)}
               aria-label={`${spot.cat.name} 분류 열기`}>{spot.cat.name}</button>
-            <small>{spot.cat.subjects.length}개 과목 · {spot.cat.examCount}개 시험</small>
           </div>
         </Html>
       )}

@@ -96,7 +96,6 @@
     font-family: Georgia, "Nanum Myeongjo", ui-serif, serif;
     font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: -.01em;
   }
-  .cat-meta { font-size: 12px; color: var(--ink-soft); }
   /* 분류 안의 과목은 한 칸 들여쓴다 */
   details.category > details.subject { margin-left: 14px; }
 
@@ -725,11 +724,8 @@ function render() {
       catDet.className = 'category';
       // 검색·필터 중에는 늘 펼쳐 보여주고, 그 밖에는 접어둔 기억을 따른다
       catDet.open = !!(state.q || state.flagOnly) || !isCatClosed(cName);
-      var catExams = 0;
-      subjects.forEach(function (sn) { catExams += Object.keys(byCat[cName][sn]).length; });
       var catSum = document.createElement('summary');
-      catSum.innerHTML = '<span class="cat-name"></span><span class="cat-meta">'
-        + subjects.length + '개 과목 · ' + catExams + '개 시험</span>';
+      catSum.innerHTML = '<span class="cat-name"></span>';
       catSum.querySelector('.cat-name').textContent = cName;
       catDet.appendChild(catSum);
       catDet.addEventListener('toggle', function () {
