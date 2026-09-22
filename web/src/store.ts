@@ -25,14 +25,14 @@ export type Mode = '3d' | 'list';
 
 export function favKey(category: string, subject: string) { return category + '||' + subject; }
 
-// 기본은 어디서나 3D. 사용자가 목록으로 바꾸면 그 선택을 기억한다.
-// (폰에서는 입자·별 개수만 줄여서 돌린다 - Galaxy의 lowPower 참고)
+// 기본은 어디서나 목록. 3D는 모바일에서 조작이 불편해서 처음 오는 사람은
+// 목록으로 시작하게 한다. 사용자가 3D로 바꾸면 그 선택을 기억한다.
 export function detectDefaultMode(): Mode {
   try {
     const saved = localStorage.getItem(KEYS.mode);
     if (saved === '3d' || saved === 'list') return saved;
   } catch { /* ignore */ }
-  return '3d';
+  return 'list';
 }
 
 interface State {
