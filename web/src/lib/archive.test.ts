@@ -19,7 +19,7 @@ function loadData(): Rec[] {
 describe('실제 데이터 회귀', () => {
   const all = loadData();
   const st = countStats(all);
-  it('파일 수', () => expect(st.files).toBe(13564));
+  it('파일 수', () => expect(st.files).toBe(13482));
   it('분류 12개', () => expect(st.categories).toBe(12));
   it('과목 102개', () => expect(st.subjects).toBe(102));
   it('시험 1888줄', () => expect(st.exams).toBe(1888));

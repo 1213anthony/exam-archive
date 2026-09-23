@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useStore, selectVisible, favKey } from '../store';
 import { buildTree, incompleteExamKeys, type Category } from '../lib/archive';
 import { colorOf } from '../theme/palette';
-import { ExamRow } from './ExamRow';
+import { ExamList } from './ExamList';
 
 export function useVisibleTree(): { tree: Category[]; rowCount: number } {
   const data = useStore((s) => s.data);
@@ -69,7 +69,7 @@ export function ClassicList() {
                 </button>
               </summary>
               <div className="subj-body">
-                {s.exams.map((e) => <ExamRow key={e.key} exam={e} category={c.name} showReview={flagOnly} />)}
+                <ExamList exams={s.exams} category={c.name} showReview={flagOnly} />
               </div>
             </details>
           ));

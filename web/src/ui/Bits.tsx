@@ -5,7 +5,7 @@ import { type Subject } from '../lib/archive';
 import { downloadAsZip } from '../lib/bulkDownload';
 import { CLIENT_ID } from '../admin/adminStore';
 import { colorOf } from '../theme/palette';
-import { ExamRow } from './ExamRow';
+import { ExamList } from './ExamList';
 
 export function Loading({ text }: { text: string }) {
   return (
@@ -90,7 +90,7 @@ export function ExamPanel({ subject }: { subject: Subject | null }) {
             <button className="btn sm close" onClick={() => goSubject(subject.category, null)} aria-label="닫기">Esc</button>
           </div>
           <div className="panel-body">
-            {subject.exams.map((e) => <ExamRow key={e.key} exam={e} category={subject.category} showReview={flagOnly} />)}
+            <ExamList exams={subject.exams} category={subject.category} showReview={flagOnly} />
           </div>
         </motion.aside>
       )}

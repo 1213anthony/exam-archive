@@ -146,6 +146,10 @@ details.subj[open] > summary::before { content: "▾"; }
 .star:hover, .star.on { color: var(--warn); text-shadow: 0 0 12px rgba(251,191,36,.6); }
 .subj-body { padding: 4px 0 12px 24px; }
 
+/* ---- 중간/기말 필터 ---- */
+.examtype-filter { display: flex; gap: 6px; margin: 2px 0 10px; }
+.examtype-filter .btn.sm .n { opacity: .7; margin-left: 5px; font-size: 11px; }
+
 /* ---- 시험 한 줄 ---- */
 .exam {
   display: flex; align-items: center; gap: 12px; padding: 10px 4px;
