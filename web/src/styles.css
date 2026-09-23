@@ -230,19 +230,22 @@ a.doc.a:hover { background: color-mix(in srgb, var(--c, var(--accent)) 15%, tran
 .loading p { margin-top: 26px; color: var(--ink-mid); text-align: center; }
 
 /* ---- 관리 (검색창에 "admin" 입력 + 엔터로 연다 - 평소엔 안 보임) ---- */
-.adminbox { position: fixed; right: 18px; bottom: 22px; z-index: 31; width: 340px; padding: 14px 16px; font-size: 13px; }
+.adminbox { position: fixed; right: 18px; bottom: 22px; z-index: 31; width: 340px; max-height: calc(100vh - 44px); overflow: auto; padding: 14px 16px; font-size: 13px; }
 .adminbox h3 { margin: 0 0 8px; font-size: 14px; }
 .adminbox .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.adminbox input { flex: 1; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--bg-2); color: inherit; font: inherit; }
 .muted { color: var(--ink-soft); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.trash { margin-left: 4px; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.trash, .move { margin-left: 4px; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
 .trash:hover { color: var(--danger); background: rgba(251,113,133,.12); }
-.trash:disabled { opacity: .35; cursor: not-allowed; }
+.move:hover { color: var(--accent); background: rgba(124,156,255,.12); }
+.trash:disabled, .move:disabled { opacity: .35; cursor: not-allowed; }
 .modal-bg { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6); display: grid; place-items: center; }
 .modal { width: min(560px, 92vw); padding: 20px 22px; }
 .modal h3 { margin: 0 0 10px; }
 .modal ul { max-height: 240px; overflow: auto; padding-left: 18px; font-size: 12.5px; color: var(--ink-mid); }
 .modal input { width: 100%; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); }
+.modal select { flex: 1; height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); color: inherit; font: inherit; }
 .modal .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 .btn.danger { color: #fff; background: var(--danger); border-color: transparent; }
 .log { margin-top: 10px; max-height: 140px; overflow: auto; font: 11.5px ui-monospace, monospace; color: var(--ink-mid); }

@@ -1233,6 +1233,7 @@ WEB_FIELDS = [
     "id", "filename", "category", "subject", "subject_detail",
     "year", "semester", "examtype", "doctype",
     "parsed_ok", "folder_mismatch", "duplicate_sibling_folder", "size", "md5",
+    "parent_id",  # 관리자 패널의 "위치 변경"이 파일을 옮길 때 필요 (지금 부모 폴더)
 ]
 
 
@@ -1670,6 +1671,9 @@ def crawl(service, folder_id, folder_path, layout="분류먼저"):
             rec["duplicate_folder_modified"] = None
             rec["modified_time"] = child.get("modifiedTime")
             rec["size"] = int(child["size"]) if child.get("size") else None
+            # 관리자 패널에서 "위치 변경"(드라이브에서 다른 폴더로 옮기기)을 하려면
+            # 지금 부모 폴더 ID를 알아야 한다. 재귀 호출 인자로 이미 갖고 있어 공짜.
+            rec["parent_id"] = folder_id
             # 드라이브가 준 해시를 쓰고, 없으면 예전에 직접 받아 계산해둔 값을 쓴다
             rec["md5"] = child.get("md5Checksum") or MD5_CACHE.get(child["id"])
             records.append(rec)
@@ -1761,6 +1765,7 @@ def crawl_incremental(service, since_iso):
         rec["duplicate_folder_modified"] = None
         rec["modified_time"] = f.get("modifiedTime")
         rec["size"] = int(f["size"]) if f.get("size") else None
+        rec["parent_id"] = parents[0]
         rec["md5"] = f.get("md5Checksum") or MD5_CACHE.get(f["id"])
         records.append(rec)
     return records, skipped

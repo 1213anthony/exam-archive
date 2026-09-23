@@ -2,6 +2,7 @@ import { useStore } from '../store';
 import { viewUrl, type Exam, type ExamUnit, type Rec } from '../lib/archive';
 import { colorOf } from '../theme/palette';
 import { TrashButton } from '../admin/TrashButton';
+import { MoveButton } from '../admin/MoveButton';
 
 function Doc({ r, cls, text }: { r: Rec | null; cls: 'q' | 'a'; text: string }) {
   const selected = useStore((s) => !!(r && s.selected[r.id]));
@@ -13,6 +14,7 @@ function Doc({ r, cls, text }: { r: Rec | null; cls: 'q' | 'a'; text: string }) 
       <input type="checkbox" className="pick" checked={selected}
         onChange={(e) => toggle(r, e.target.checked)} title={r.filename} />
       <a className={'doc ' + cls} href={viewUrl(r)} target="_blank" rel="noopener">{text}</a>
+      {admin && <MoveButton rec={r} />}
       {admin && <TrashButton rec={r} />}
     </span>
   );

@@ -21,6 +21,7 @@ CARRY_OVER = [
     "duplicate_folder_modified",
     "modified_time",
     "size",
+    "parent_id",
 ]
 
 with open("data.json", encoding="utf-8") as f:

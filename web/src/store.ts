@@ -57,6 +57,7 @@ interface State {
   admin: { email: string; token: string } | null;
 
   setData(data: Rec[], version: string): void;
+  patchRecord(id: string, patch: Partial<Rec>): void;
   setMode(m: Mode): void;
   setQuery(q: string): void;
   goCategory(c: string | null): void;
@@ -94,6 +95,8 @@ export const useStore = create<State>((set, get) => ({
   admin: null,
 
   setData: (data, version) => set({ data, version, loaded: true }),
+  // 관리자가 파일을 옮긴 뒤, 다음 크롤링 전까지 화면에서도 바로 반영되게 한다
+  patchRecord: (id, patch) => set((s) => ({ data: s.data.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
   setMode: (mode) => { try { localStorage.setItem(KEYS.mode, mode); } catch { /* */ } set({ mode }); },
   setQuery: (q) => set({ q }),
   goCategory: (category) => set({ category, subject: null }),

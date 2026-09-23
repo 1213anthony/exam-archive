@@ -1,0 +1,47 @@
+name: 기출문제 재크롤링
+
+# 관리자 패널의 "재크롤링" 버튼(또는 GitHub Actions 탭에서 수동)으로 실행한다.
+# 매번 전체를 다시 훑는다 - 이 러너는 실행마다 새로 뜨는 임시 환경이라
+# crawl_state.json(증분 크롤링 기준 시각)이 남아있지 않기 때문이다.
+# 빠른 증분 업데이트는 평소처럼 update.bat을 로컬에서 쓸 것.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install google-auth-oauthlib google-api-python-client
+
+      # 드라이브 계정 인증 정보. 로컬에서 crawl.py를 한 번 돌려 만든 token.json
+      # 내용을 그대로 레포 Settings > Secrets and variables > Actions에
+      # DRIVE_TOKEN_JSON 이름으로 저장해둬야 한다. refresh_token이 있어서
+      # 브라우저 로그인 없이도 여기서 자동으로 갱신된다.
+      - name: restore drive credentials
+        run: echo "$DRIVE_TOKEN_JSON" > token.json
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+
+      - name: crawl (full)
+        run: python crawl.py --full
+
+      - name: commit and push data.js if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.js
+          if git diff --cached --quiet; then
+            echo "변경 없음 - 커밋 안 함"
+          else
+            git commit -m "재크롤링 (GitHub Actions, 실행자: ${{ github.actor }})"
+            git push
+          fi

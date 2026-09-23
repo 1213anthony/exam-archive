@@ -17,6 +17,7 @@ export interface Rec {
   duplicate_sibling_folder?: boolean;
   size?: number | string;
   md5?: string;
+  parent_id?: string;   // 드라이브에서 지금 들어있는 폴더 ID (관리자 "위치 변경"에 씀)
 }
 
 export const CAT_ORDER = [
