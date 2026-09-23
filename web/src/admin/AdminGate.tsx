@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { useAdmin, ALLOWED_ADMINS, CLIENT_ID } from './adminStore';
+import { useAdmin, ALLOWED_ADMINS, CLIENT_ID, type LogEntry } from './adminStore';
 import { trash, untrash, moveFile, whoAmI } from './drive';
 import { loadGis } from '../lib/gis';
 import { catRank } from '../lib/archive';
@@ -28,6 +28,7 @@ export default function AdminGate() {
   const [targetCategory, setTargetCategory] = useState('');
   const [targetSubject, setTargetSubject] = useState('');
   const [moveBusy, setMoveBusy] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const configured = !!CLIENT_ID && ALLOWED_ADMINS.length > 0;
 
   // GitHub Actions 원격 재크롤링용 토큰. 번들에는 절대 안 들어가고, 이 브라우저에
@@ -118,6 +119,8 @@ export default function AdminGate() {
       addLog({
         at: new Date().toISOString(), action: 'move', id: r.id, name: r.filename,
         note: `${r.category} · ${r.subject} → ${targetCategory} · ${targetSubject}`,
+        fromParent: r.parent_id, toParent: dest.parent_id,
+        fromCategory: r.category, fromSubject: r.subject, toCategory: targetCategory, toSubject: targetSubject,
       });
       cancelMove();
     } catch (e: any) {
@@ -127,6 +130,22 @@ export default function AdminGate() {
     }
   };
   const unchanged = !!movePending && targetCategory === movePending.category && targetSubject === movePending.subject;
+
+  const doUnmove = async (e: LogEntry) => {
+    if (!admin || !e.fromParent || !e.toParent) return;
+    try {
+      await moveFile(admin.token, e.id, e.fromParent, e.toParent);
+      patchRecord(e.id, { category: e.fromCategory, subject: e.fromSubject, parent_id: e.fromParent });
+      addLog({
+        at: new Date().toISOString(), action: 'move', id: e.id, name: e.name,
+        note: `${e.toCategory} · ${e.toSubject} → ${e.fromCategory} · ${e.fromSubject} (되돌림)`,
+        fromParent: e.toParent, toParent: e.fromParent,
+        fromCategory: e.toCategory, fromSubject: e.toSubject, toCategory: e.fromCategory, toSubject: e.fromSubject,
+      });
+    } catch (err: any) {
+      addLog({ at: new Date().toISOString(), action: 'error', id: e.id, name: e.name, note: err.message });
+    }
+  };
 
   const saveGhPat = (v: string) => {
     setGhPat(v);
@@ -149,14 +168,19 @@ export default function AdminGate() {
     <>
       {open && (
         <div className="adminbox glass">
-          {!configured ? (
-            <>
-              <h3>관리 기능 설정 필요</h3>
-              <p className="muted">web/.env 에 <code>VITE_GOOGLE_CLIENT_ID</code> 와 <code>VITE_ALLOWED_ADMINS</code> 를 넣고 다시 빌드하세요. (.env.example 참고)</p>
-            </>
+          <div className="adminbox-head">
+            <h3>
+              {!configured ? '관리 기능 설정 필요' : !admin ? '관리자 로그인' : <>관리 모드 <span className="muted">· {admin.email}</span></>}
+            </h3>
+            <button className="collapse-btn" onClick={() => setCollapsed((v) => !v)}
+              title={collapsed ? '펼치기' : '접기'} aria-label={collapsed ? '펼치기' : '접기'}>
+              {collapsed ? '▸' : '▾'}
+            </button>
+          </div>
+          {!collapsed && (!configured ? (
+            <p className="muted">web/.env 에 <code>VITE_GOOGLE_CLIENT_ID</code> 와 <code>VITE_ALLOWED_ADMINS</code> 를 넣고 다시 빌드하세요. (.env.example 참고)</p>
           ) : !admin ? (
             <>
-              <h3>관리자 로그인</h3>
               <p className="muted">파일을 휴지통으로 보내거나 다른 과목 폴더로 옮길 수 있습니다. 파일 <b>소유자 계정</b>으로 로그인해야 실제로 됩니다.</p>
               <div className="row">
                 <button className="btn sm on" onClick={signIn} disabled={busy}>{busy ? '로그인 중…' : 'Google로 로그인'}</button>
@@ -166,7 +190,6 @@ export default function AdminGate() {
             </>
           ) : (
             <>
-              <h3>관리 모드 <span className="muted">· {admin.email}</span></h3>
               <p className="muted">문제/해설 옆 <b>↦</b>는 다른 과목으로 옮기기, <b>×</b>는 휴지통으로 보내기입니다. 회색으로 뜨면 이 계정에 권한이 없는 파일입니다(마우스를 올리면 소유자가 보임).</p>
               <div className="row">
                 <button className="btn sm" onClick={saveLog} disabled={!log.length}>기록 저장 ({log.length})</button>
@@ -179,6 +202,9 @@ export default function AdminGate() {
                       [{e.at.slice(11, 19)}] {e.action === 'trash' ? '휴지통 →' : e.action === 'untrash' ? '복구 ←' : e.action === 'move' ? '이동 →' : '실패'} {e.name}
                       {e.note ? ` (${e.note})` : ''}
                       {e.action === 'trash' && <button className="reviewbtn" onClick={() => doUntrash(e.id, e.name)}>되돌리기</button>}
+                      {e.action === 'move' && e.fromParent && e.toParent && !e.note?.includes('되돌림') && (
+                        <button className="reviewbtn" onClick={() => doUnmove(e)}>되돌리기</button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -200,7 +226,7 @@ export default function AdminGate() {
               </div>
               {ghMsg && <p className="muted" style={{ fontSize: 12.5 }}>{ghMsg}</p>}
             </>
-          )}
+          ))}
         </div>
       )}
       {pending && admin && (

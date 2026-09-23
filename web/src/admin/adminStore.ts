@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import type { Rec } from '../lib/archive';
 
-export interface LogEntry { at: string; action: 'trash' | 'untrash' | 'move' | 'error'; id: string; name: string; note?: string }
+export interface LogEntry {
+  at: string; action: 'trash' | 'untrash' | 'move' | 'error'; id: string; name: string; note?: string;
+  // 'move'만 씀 - "되돌리기"를 하려면 어느 폴더에서 어느 폴더로 갔는지 그대로 있어야 한다
+  fromParent?: string; toParent?: string;
+  fromCategory?: string; fromSubject?: string; toCategory?: string; toSubject?: string;
+}
 
 interface AdminState {
   pending: Rec | null;              // 휴지통으로 보낼지 묻는 중인 파일
