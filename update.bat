@@ -20,6 +20,11 @@ git diff --cached --quiet
 if errorlevel 1 (
     git commit -m "update data.js"
     git push
+    if errorlevel 1 (
+        echo Remote has newer commits - merging and retrying...
+        git pull --rebase -X theirs
+        git push
+    )
     echo.
     echo ===== done: pushed to the site =====
 ) else (

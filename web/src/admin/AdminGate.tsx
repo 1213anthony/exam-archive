@@ -212,7 +212,8 @@ export default function AdminGate() {
               <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '12px 0' }} />
               <h3 style={{ fontSize: 13 }}>재크롤링</h3>
               <p className="muted" style={{ fontSize: 12.5 }}>
-                드라이브를 전체 다시 훑어 사이트를 갱신합니다(GitHub Actions에서 실행, 몇 분 걸림).
+                드라이브 변경은 15분마다 자동으로 감지해 반영되므로 보통은 누를 필요 없습니다.
+                지금 바로 전체를 다시 훑고 싶을 때만 쓰세요(GitHub Actions에서 실행, 몇 분 걸림).
                 레포 Actions 쓰기 권한이 있는 GitHub 토큰이 필요 — 번들에는 안 들어가고 이 탭에만 기억됩니다.
               </p>
               <div className="row">

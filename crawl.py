@@ -1771,7 +1771,64 @@ def crawl_incremental(service, since_iso):
     return records, skipped
 
 
+# ---- 변경 감지 (GitHub Actions가 15분마다 부른다) ----------------------------
+# 드라이브는 바뀌는 순간 알려주는 기능(웹훅)을 쓰려면 받을 서버가 있어야 해서,
+# 대신 "지난 크롤링 이후 바뀐 게 있나"만 가볍게 물어본다(요청 한두 번).
+# 바뀐 게 없으면 아무것도 안 하고, 있으면 업로드가 한동안 잠잠해진 뒤에만
+# 전체 크롤링을 하게 한다 - 여러 파일을 올리는 도중의 반쪽 상태가 반영되지 않게.
+SETTLE_MINUTES = 20
+
+
+def detect_changes(service, since_iso, settle_minutes=SETTLE_MINUTES):
+    root_by_id = {root_id: layout for _, root_id, layout in ROOT_FOLDERS}
+    query = ("(mimeType = 'application/pdf' or mimeType = 'application/vnd.google-apps.folder') "
+             f"and modifiedTime > '{since_iso}'")
+    hits = []
+    page_token = None
+    while True:
+        resp = service.files().list(
+            q=query, fields="nextPageToken, files(id, name, parents, modifiedTime)",
+            pageSize=1000, pageToken=page_token,
+        ).execute()
+        hits.extend(resp.get("files", []))
+        page_token = resp.get("nextPageToken")
+        if not page_token:
+            break
+
+    # 이 계정이 볼 수 있는 드라이브 전체에서 찾은 거라, 우리 기출문제 폴더 밑의 것만 남긴다
+    cache = {}
+    ours = []
+    for f in hits:
+        parents = f.get("parents") or []
+        if f["id"] in root_by_id or (parents and find_root_and_path(service, parents[0], root_by_id, cache)):
+            ours.append(f)
+    if not ours:
+        return "none", f"{since_iso} 이후 바뀐 항목 없음"
+
+    latest = max(datetime.datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")) for f in ours)
+    names = ", ".join(unicodedata.normalize("NFC", f["name"]) for f in ours[:5])
+    detail = f"바뀐 항목 {len(ours)}개 (예: {names}), 마지막 변경 {latest.isoformat()}"
+    if datetime.datetime.now(datetime.timezone.utc) - latest < datetime.timedelta(minutes=settle_minutes):
+        return "settling", detail + f" - 아직 올리는 중일 수 있어 {settle_minutes}분 잠잠해질 때까지 기다림"
+    return "changed", detail
+
+
+def run_detect():
+    """마지막 줄에 none / settling / changed 중 하나를 찍는다(워크플로가 읽음)."""
+    state = load_state()
+    if not state:
+        print("기준 시각이 없음 - 전체 크롤링으로 기준을 만든다", file=sys.stderr)
+        print("changed")
+        return
+    status, detail = detect_changes(get_service(), state["since"])
+    print(detail, file=sys.stderr)
+    print(status)
+
+
 def main():
+    if "--detect" in sys.argv:
+        run_detect()
+        return
     force_full = "--full" in sys.argv
     state = None if force_full else load_state()
     prev_records = None
