@@ -11,7 +11,8 @@ name: 기출문제 재크롤링
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    # 정각/15분 단위는 GitHub 전체가 몰려서 지연·누락이 잦다 - 살짝 비켜서 돈다
+    - cron: '7,22,37,52 * * * *'
 
 permissions:
   contents: write
