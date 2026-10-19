@@ -1731,7 +1731,10 @@ def find_root_and_path(service, parent_id, root_by_id, cache):
 
 def crawl_incremental(service, since_iso):
     root_by_id = {root_id: layout for _, root_id, layout in ROOT_FOLDERS}
-    query = f"mimeType = 'application/pdf' and trashed = false and modifiedTime > '{since_iso}'"
+    # 업로드한 파일의 modifiedTime은 올린 사람 PC의 원래 수정 시각이 남을 수 있어서
+    # (옛날 PDF를 오늘 올리면 수정 시각이 몇 달 전) 업로드 시각(createdTime)도 같이 본다
+    query = (f"mimeType = 'application/pdf' and trashed = false "
+             f"and (modifiedTime > '{since_iso}' or createdTime > '{since_iso}')")
     hits = []
     page_token = None
     while True:
@@ -1781,13 +1784,14 @@ SETTLE_MINUTES = 20
 
 def detect_changes(service, since_iso, settle_minutes=SETTLE_MINUTES):
     root_by_id = {root_id: layout for _, root_id, layout in ROOT_FOLDERS}
+    # createdTime도 보는 이유는 crawl_incremental 주석 참고 (옛날 파일을 새로 올린 경우)
     query = ("(mimeType = 'application/pdf' or mimeType = 'application/vnd.google-apps.folder') "
-             f"and modifiedTime > '{since_iso}'")
+             f"and (modifiedTime > '{since_iso}' or createdTime > '{since_iso}')")
     hits = []
     page_token = None
     while True:
         resp = service.files().list(
-            q=query, fields="nextPageToken, files(id, name, parents, modifiedTime)",
+            q=query, fields="nextPageToken, files(id, name, parents, modifiedTime, createdTime)",
             pageSize=1000, pageToken=page_token,
         ).execute()
         hits.extend(resp.get("files", []))
@@ -1805,7 +1809,10 @@ def detect_changes(service, since_iso, settle_minutes=SETTLE_MINUTES):
     if not ours:
         return "none", f"{since_iso} 이후 바뀐 항목 없음"
 
-    latest = max(datetime.datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")) for f in ours)
+    def _t(s):
+        return datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    # "아직 올리는 중인가"는 마지막 활동(수정 또는 업로드) 시각으로 판단
+    latest = max(max(_t(f["modifiedTime"]), _t(f.get("createdTime") or f["modifiedTime"])) for f in ours)
     names = ", ".join(unicodedata.normalize("NFC", f["name"]) for f in ours[:5])
     detail = f"바뀐 항목 {len(ours)}개 (예: {names}), 마지막 변경 {latest.isoformat()}"
     if datetime.datetime.now(datetime.timezone.utc) - latest < datetime.timedelta(minutes=settle_minutes):
